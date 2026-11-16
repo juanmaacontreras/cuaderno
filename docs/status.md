@@ -24,10 +24,9 @@ Updated: 2026-11-16. Read with `CLAUDE.md` at the start of a session; update at 
 
 ## Next
 
-1. Juanma tried v5 on the tablet: no difference by feel; delay shown is lowest in "Baja
-   latencia", then Jetpack Ink, then "Clásico". Waiting for his OK to build on "Baja
-   latencia" (see `decisions.md`), and for palm, pen button and pressure results.
-2. The three open decisions left (`plan.md` section 10: name, paper, what he really uses).
-3. He records a real page; it goes to `app/src/test/resources/recordings/`.
-4. Survey of what he really uses in Samsung Notes, written into `plan.md` section 3.
-5. Design of the writing screen as rendered variants (dark), for his OK. That closes phase 0.
+1. Juanma picks the writing screen layout (A, B or C) and the paper (dark or light).
+   That closes phase 0.
+2. Phase 1 on the chosen engine (own stroke, front buffer), strokes in `core` in page
+   points; the bench and Jetpack Ink go away.
+3. Still open: the name, what he really uses in Samsung Notes (`plan.md` section 3), and a
+   real pen recording from the tablet for the tests.

@@ -5,6 +5,20 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **Engine chosen: our own stroke through the front buffer ("Baja latencia")** (origen:
+  Juanma, on Claude's recommendation). Jetpack Ink and "Clásico" leave the app in phase 1.
+- **Battery** (origen: Juanma): the app may spend what writing needs, but nothing
+  exaggerated; to be watched as it grows. For whoever builds (origen: Claude): draw only
+  when there is input, no work while the pen is still, no wake locks, nothing in the
+  background, autosave on a pause in writing instead of a fast timer.
+- **Fingers after the pen** (origen: Juanma, observed on v5): once the pen has come near,
+  fingers and palm no longer write, even with the pen away. That is the bench's palm
+  rejection, on purpose. In the writing screen (origen: Claude, to confirm) the pen writes
+  and fingers only move and zoom the page; "write with a finger" would be a setting.
+- **Writing screen: three layouts proposed as images** (`DesignTest`, `tools/screens.sh`):
+  A bar on top, B floating pill, C bar on the left; plus A on light paper for the open
+  paper decision. Waiting for his pick.
+
 - **Bench result on the tablet (v5)** (origen: Juanma): he cannot tell the three engines
   apart by feel. By the delay each shows, "Baja latencia" is lowest, then Jetpack Ink, then
   "Clásico". The figures themselves were not written down.
