@@ -13,7 +13,8 @@ https://claude.ai/artifact/PHQmVerxfbkkCipzxGaF2d
   A separate app; linking it to other devices comes only after it works (phase 6).
 - **Priority one is how writing feels** (Juanma, 2026-11-15): minimum stroke delay and a
   comfortable pen come before any feature. A change that makes writing worse does not ship.
-  See "Prioridad número uno" in the plan.
+  See "Prioridad número uno" in the plan. Battery: spend what writing needs, nothing
+  exaggerated (no work while the pen is still, nothing in the background).
 - Start each phase in plan mode with rendered designs (dark theme) and wait for his OK.
 - One session, one change, one PR. Every decision goes in `docs/decisions.md`, the state in
   `docs/status.md`. What stays only in the chat is lost.
