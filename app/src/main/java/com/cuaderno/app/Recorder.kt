@@ -5,7 +5,6 @@ import android.os.Build
 import android.view.MotionEvent
 import android.widget.FrameLayout
 import cuaderno.core.Recording
-import com.cuaderno.app.ink.PenHost
 
 /**
  * Wraps the page and, while [recording], writes down every sample the pen
@@ -65,7 +64,8 @@ class Recorder(context: Context) : FrameLayout(context) {
     }
 
     private fun wanted(event: MotionEvent, index: Int): Boolean {
-        if (PenHost.isPen(event, index)) {
+        val tool = event.getToolType(index)
+        if (tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER) {
             stylusSeen = true
             return true
         }

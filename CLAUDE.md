@@ -20,8 +20,11 @@ https://claude.ai/artifact/PHQmVerxfbkkCipzxGaF2d
   `docs/status.md`. What stays only in the chat is lost.
 - Modules: `core` (plain Kotlin: model, file format, pen recordings; most logic belongs here),
   `kit` (Nord `Ui` and `Updater`, shared with his other apps; never style a view by hand),
-  `app` (Android; text in `Strings.kt`). Until phase 1 the app is only the bench
-  (`BenchActivity`: three ink engines to compare).
+  `app` (Android; text in `Strings.kt`; the page is `page/PageView.kt` and `page/Render.kt`).
+- His way of writing: tools on the left edge, A4 sheets, a fixed-width line (no pressure),
+  the pen writes and fingers only move and zoom.
+- The front buffer cannot run in the tests: after touching `PageView`'s display code, try it
+  on an emulator (stylus through `adb shell input stylus swipe`) before releasing.
 - Never lose a note: atomic autosave, our own documented file format with a version number,
   always exportable to PDF. Read `docs/format.md` before touching `core`'s file code.
 - Code, comments and commits in English. UI text in Rioplatense Spanish. Look: Nord.

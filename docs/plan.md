@@ -76,8 +76,14 @@ Lo que hace con Samsung Notes hoy, y que la app tiene que cubrir antes de reempl
 - Hojas cuadriculadas para gráficos y diagramas.
 - Modo oscuro siempre. Mismo aspecto que sus otras apps (paleta Nord).
 
-No está relevado en detalle qué funciones de Samsung Notes usa de verdad y cuáles nunca
-tocó. **Primera tarea de la fase 0:** preguntárselo y anotarlo acá.
+Lo que dijo hasta ahora de cómo usa Samsung Notes (origen: Juanma, 2026-11-16):
+
+- La barra de herramientas a la izquierda.
+- Hojas tamaño A4, porque después pasa todo a PDF.
+- Sin presión: la desactiva, quiere la línea siempre del mismo grosor.
+- Que no gaste batería de más.
+
+Falta relevar el resto (qué herramientas usa de verdad y cuáles nunca tocó).
 
 ## 4. Lo mejor de cada app
 

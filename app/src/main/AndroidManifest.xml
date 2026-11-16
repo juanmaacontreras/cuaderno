@@ -13,7 +13,7 @@
 
         <!-- Turning the tablet or resizing the window must not wipe what is written. -->
         <activity
-            android:name=".BenchActivity"
+            android:name=".WriteActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
             android:exported="true"
             android:resizeableActivity="true">

@@ -66,14 +66,8 @@ dependencies {
     implementation(project(":kit"))
     implementation("androidx.core:core-ktx:1.16.0")
 
-    // The two ink engines phase 0 compares on the tablet (docs/plan.md, "Motor de tinta").
-    implementation("androidx.ink:ink-authoring:1.0.0")
-    implementation("androidx.ink:ink-brush:1.0.0")
-    implementation("androidx.ink:ink-geometry:1.0.0")
-    implementation("androidx.ink:ink-rendering:1.0.0")
-    implementation("androidx.ink:ink-strokes:1.0.0")
+    // Low-latency drawing: the stroke in progress goes to the front buffer (page/PageView.kt).
     implementation("androidx.graphics:graphics-core:1.0.4")
-    implementation("androidx.input:input-motionprediction:1.0.1")
 
     testImplementation("junit:junit:4.13.2")
     // Draws the real screens to PNG without a device (tools/screens.sh).

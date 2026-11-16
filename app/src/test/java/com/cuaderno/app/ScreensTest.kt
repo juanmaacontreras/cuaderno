@@ -3,7 +3,6 @@ package com.cuaderno.app
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
-import com.cuaderno.app.ink.OwnSurface
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,39 +21,32 @@ import java.io.File
 class ScreensTest {
     private val out = System.getProperty("cuaderno.screens") ?: ""
 
-    /** The bench the way the tablet shows it, lying down, with the synthetic recording written on it. */
-    @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")
-    @Test fun benchOnTheTablet() {
+    private fun write(width: Int, height: Int, name: String, scale: Float, zoomOut: Boolean = false) {
         assumeTrue(out.isNotEmpty())
-        val activity = Robolectric.buildActivity(BenchActivity::class.java).setup().get()
+        WriteActivity.lowLatency = false
+        val activity = Robolectric.buildActivity(WriteActivity::class.java).setup().get()
         val root = activity.window.decorView
-        layout(root, 2304, 1440)
-        Replay.into(activity.surface as OwnSurface, Replay.load("synthetic.csv"))
-        save(root, 2304, 1440, "1-banco-tablet.png")
+        layout(root, width, height)
+        Replay.into(activity.page, Replay.load("synthetic.csv"), scale = scale, dx = 20f, dy = -60f * scale)
+        if (zoomOut) activity.page.scrollBy(0f, -500f)
+        layout(root, width, height)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        root.draw(Canvas(bitmap))
+        File(out).mkdirs()
+        File(out, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Config(sdk = [34], qualifiers = "w393dp-h851dp-xxhdpi")
-    @Test fun benchOnThePhone() {
-        assumeTrue(out.isNotEmpty())
-        val activity = Robolectric.buildActivity(BenchActivity::class.java).setup().get()
-        val root = activity.window.decorView
-        layout(root, 1080, 2340)
-        Replay.into(activity.surface as OwnSurface, Replay.load("synthetic.csv"), scale = 0.45f)
-        save(root, 1080, 2340, "2-banco-celular.png")
-    }
+    /** The tablet lying down, as he uses it. */
+    @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")
+    @Test fun writingOnTheTablet() = write(2304, 1440, "1-escribir-tablet.png", scale = 0.9f)
+
+    @Config(sdk = [34], qualifiers = "w720dp-h1152dp-port-xhdpi")
+    @Test fun writingOnTheTabletUpright() = write(1440, 2304, "2-escribir-tablet-vertical.png", scale = 0.55f)
 
     private fun layout(view: View, width: Int, height: Int) {
         view.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY))
         view.layout(0, 0, width, height)
-    }
-
-    private fun save(view: View, width: Int, height: Int, name: String) {
-        layout(view, width, height)
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        view.draw(Canvas(bitmap))
-        File(out).mkdirs()
-        File(out, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 }

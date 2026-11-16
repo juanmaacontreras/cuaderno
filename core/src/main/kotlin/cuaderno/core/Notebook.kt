@@ -34,7 +34,14 @@ class Page(
     val height: Float,
     val paper: Paper,
     val strokes: List<Stroke>,
-)
+) {
+    fun with(strokes: List<Stroke>) = Page(id, width, height, paper, strokes)
+
+    companion object {
+        const val A4_WIDTH = 595f
+        const val A4_HEIGHT = 842f
+    }
+}
 
 /**
  * A notebook as it is in memory. [created] and [modified] are ISO-8601 texts

@@ -122,6 +122,21 @@ object Ui {
             setOnClickListener { onClick() }
         }
 
+    /**
+     * A square tool button with an icon from [Icons]: filled when it is the
+     * tool in use ([on]), faint when it cannot be used now ([dim]).
+     */
+    fun tool(context: Context, icon: String, on: Boolean = false, dim: Boolean = false, onClick: () -> Unit): View =
+        View(context).apply {
+            val glyph = Icons.drawable(icon, if (on) BG else if (dim) MUTED else TEXT)
+            val inset = dp(context, 11f)
+            background = android.graphics.drawable.LayerDrawable(arrayOf(rounded(if (on) ACCENT else 0, 12f, context), glyph)).apply {
+                setLayerInset(1, inset, inset, inset, inset)
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(context, 44f), dp(context, 44f))
+            setOnClickListener { onClick() }
+        }
+
     fun gap(context: Context, heightDp: Float) = View(context).apply {
         layoutParams = LinearLayout.LayoutParams(1, dp(context, heightDp))
     }
