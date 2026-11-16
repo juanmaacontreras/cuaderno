@@ -5,6 +5,17 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **Bench result on the tablet (v5)** (origen: Juanma): he cannot tell the three engines
+  apart by feel. By the delay each shows, "Baja latencia" is lowest, then Jetpack Ink, then
+  "Clásico". The figures themselves were not written down.
+- **Recommended engine: our own stroke through the front buffer ("Baja latencia")** (origen:
+  Claude, waiting for his OK). With feel tied, the measured delay decides, and it also keeps
+  the drawing path ours: testable without a device (Jetpack Ink's native code does not load
+  in the tests), no dependence on a non-public probe, strokes already in our own model. The
+  cost is writing the partial eraser and the lasso geometry ourselves, in `core`, with tests.
+  Caveat: the two delays are not measured at exactly the same point; slow-motion video is
+  the tie-breaker if it ever matters.
+
 - **Public GitHub repo created** (origen: Juanma, "sí, creá el repo"), for the updater.
   Signing key generated in `~/.config/cuaderno/signing/`: losing it means reinstalling.
 - **Phase 0 started without the plan being formally approved** (origen: Juanma, "quiero que

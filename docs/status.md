@@ -24,8 +24,9 @@ Updated: 2026-11-16. Read with `CLAUDE.md` at the start of a session; update at 
 
 ## Next
 
-1. Juanma installs the first release on the tablet, writes with the three engines against
-   Samsung Notes and picks.
+1. Juanma tried v5 on the tablet: no difference by feel; delay shown is lowest in "Baja
+   latencia", then Jetpack Ink, then "Clásico". Waiting for his OK to build on "Baja
+   latencia" (see `decisions.md`), and for palm, pen button and pressure results.
 2. The three open decisions left (`plan.md` section 10: name, paper, what he really uses).
 3. He records a real page; it goes to `app/src/test/resources/recordings/`.
 4. Survey of what he really uses in Samsung Notes, written into `plan.md` section 3.
