@@ -17,7 +17,8 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
   the stroke ends. If he prefers it, prediction is the next thing to try there.
 - **The delay shown is each engine's own**: pen sample to drawing calls finished. It leaves
   out the display, so it compares engines and is not what the eye sees. For Jetpack Ink it
-  comes from the library's latency probe, which is not public API: bench only. The number
+  comes from the library's latency probe (`LatencyData`, the render helper's
+  `finishesDrawCalls`), which is not public API: bench only. The number
   that counts is slow-motion video of pen against ink (plan, "Se mide").
 - **Versions**: Gradle 8.9, AGP 8.7.3, Kotlin 2.0.21 (what `androidx.ink` 1.0.0 was built
   with), compileSdk 35, minSdk 29. `androidx.ink` 1.0.0 stable, not the 1.1.0 alphas.

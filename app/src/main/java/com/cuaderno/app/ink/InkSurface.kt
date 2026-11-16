@@ -72,7 +72,11 @@ class InkSurface(context: Context) : PenHost(context), Surface {
         // engines; nothing in the real app may depend on it.
         @SuppressLint("RestrictedApi")
         inProgress.setLatencyDataCallback(LatencyDataCallback { data ->
-            val ms = (data.strokesViewFinishesDrawCalls - data.osDetectsEvent) / 1e6f
+            // Which field carries the time depends on how the library is rendering.
+            val front = data.canvasFrontBufferStrokesRenderHelperData.finishesDrawCalls
+            val hwui = data.hwuiInProgressStrokesRenderHelperData.finishesDrawCalls
+            val drawn = if (front != Long.MIN_VALUE) front else hwui
+            val ms = if (drawn == Long.MIN_VALUE) -1f else (drawn - data.osDetectsEvent) / 1e6f
             // Predicted samples carry a time in the future: not a real delay.
             if (ms > 0f && ms < 1000f) onLatency?.invoke(ms)
         })
