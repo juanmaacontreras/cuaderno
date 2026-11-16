@@ -1,10 +1,13 @@
-build/
+# Android / Gradle
 .gradle/
+build/
 local.properties
 *.apk
-*.jks
+*.aab
+.kotlin/
+
+# Never: signing keys, and notes (notebooks live on the device, not in the repo)
 *.keystore
-signing.properties
-.idea/
-*.iml
-.DS_Store
+*.jks
+*.pem
+*.key

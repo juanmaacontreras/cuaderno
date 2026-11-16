@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- The downloaded update, handed to the system installer. -->
+    <cache-path name="update" path="update/" />
+    <!-- Pen recordings, shared out of the app from the bench. -->
+    <cache-path name="recordings" path="recordings/" />
+</paths>

@@ -1,3 +1,4 @@
 # Cuaderno
 
-Own handwriting notes app for an Android tablet with a stylus. Plan: [docs/plan.md](docs/plan.md). No code yet.
+Handwriting notes app for an Android tablet with a stylus. Plan: `docs/plan.md`.
+State: `docs/status.md`. File format: `docs/format.md`.

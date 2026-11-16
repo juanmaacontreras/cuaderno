@@ -1,0 +1,87 @@
+import java.util.Properties
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+// The signing key lives outside the repo (~/.config/cuaderno/signing). Every APK
+// must carry the same signature or Android refuses to install it as an update.
+// Without the key the build still works, signed with the throwaway debug key.
+val signingDir = File(System.getProperty("user.home"), ".config/cuaderno/signing")
+val signingProps = Properties().apply {
+    val file = File(signingDir, "signing.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
+android {
+    namespace = "com.cuaderno.app"
+    compileSdk = 35
+    buildToolsVersion = "35.0.0"
+
+    defaultConfig {
+        applicationId = "com.cuaderno.app"
+        minSdk = 29  // low-latency drawing needs it
+        targetSdk = 35
+        versionCode = (project.findProperty("vcode") as String?)?.toIntOrNull() ?: 1
+        versionName = (project.findProperty("vname") as String?) ?: "dev"
+    }
+
+    signingConfigs {
+        if (signingProps.containsKey("storePassword")) {
+            create("app") {
+                storeFile = File(signingDir, "cuaderno.jks")
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        val key = signingConfigs.findByName("app")
+        getByName("debug") {
+            if (key != null) signingConfig = key
+        }
+        release {
+            isMinifyEnabled = false
+            if (key != null) signingConfig = key
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+}
+
+dependencies {
+    implementation(project(":core"))
+    implementation(project(":kit"))
+    implementation("androidx.core:core-ktx:1.16.0")
+
+    // The two ink engines phase 0 compares on the tablet (docs/plan.md, "Motor de tinta").
+    implementation("androidx.ink:ink-authoring:1.0.0")
+    implementation("androidx.ink:ink-brush:1.0.0")
+    implementation("androidx.ink:ink-geometry:1.0.0")
+    implementation("androidx.ink:ink-rendering:1.0.0")
+    implementation("androidx.ink:ink-strokes:1.0.0")
+    implementation("androidx.graphics:graphics-core:1.0.4")
+    implementation("androidx.input:input-motionprediction:1.0.1")
+
+    testImplementation("junit:junit:4.13.2")
+    // Draws the real screens to PNG without a device (tools/screens.sh).
+    testImplementation("org.robolectric:robolectric:4.14.1")
+}
+
+// tools/screens.sh says where the PNGs go; without it ScreensTest skips itself.
+tasks.withType<Test> {
+    systemProperty("cuaderno.screens", System.getenv("CUADERNO_SCREENS") ?: "")
+    outputs.upToDateWhen { System.getenv("CUADERNO_SCREENS").isNullOrEmpty() }
+}

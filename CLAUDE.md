@@ -4,9 +4,9 @@ Juanma's own handwriting notes app for the Galaxy Tab S10 FE with S-Pen, meant t
 Samsung Notes for university work. Part of the ecosystem:
 https://claude.ai/artifact/PHQmVerxfbkkCipzxGaF2d
 
-**Status: plan only, no code yet.** Read `docs/plan.md` (in Spanish, so Juanma can read and
-approve it) before anything else. It is the premise and the order of work, not a closed spec:
-items marked "origen: Claude" are unconfirmed suggestions.
+**Start by reading `docs/status.md`** (where it is, what is unverified, what is next), then
+`docs/plan.md` (in Spanish; the premise and the order of work, not a closed spec: items marked
+"origen: Claude" are unconfirmed) and `docs/decisions.md`.
 
 - **Does:** notebooks of pages to write and draw on with the stylus, PDF annotation, export.
 - **Does not:** edit text documents, manage tasks, replace the brain or read books (Atril).
@@ -16,13 +16,26 @@ items marked "origen: Claude" are unconfirmed suggestions.
   See "Prioridad número uno" in the plan.
 - Start each phase in plan mode with rendered designs (dark theme) and wait for his OK.
 - One session, one change, one PR. Every decision goes in `docs/decisions.md`, the state in
-  `docs/status.md`; create both in phase 0. What stays only in the chat is lost.
+  `docs/status.md`. What stays only in the chat is lost.
+- Modules: `core` (plain Kotlin: model, file format, pen recordings; most logic belongs here),
+  `kit` (Nord `Ui` and `Updater`, shared with his other apps; never style a view by hand),
+  `app` (Android; text in `Strings.kt`). Until phase 1 the app is only the bench
+  (`BenchActivity`: three ink engines to compare).
 - Never lose a note: atomic autosave, our own documented file format with a version number,
-  always exportable to PDF. See "Formato y guardado" in the plan.
+  always exportable to PDF. Read `docs/format.md` before touching `core`'s file code.
 - Code, comments and commits in English. UI text in Rioplatense Spanish. Look: Nord.
 - The starting point and the bar for stroke feel is Enlace's board:
   `~/projects/enlace/app/src/main/java/com/enlace/app/modules/board/BoardView.kt`.
-- Build tools and release flow: copy the approach of `~/projects/enlace` (`tools/toolchain.sh`,
-  `tools/release.sh`, `tools/screens.sh`); move the shared updater and UI kit to a library
-  instead of copying them a third time.
+- Session tools (JDK 17, Gradle 8.9, Android SDK 35) go in the scratchpad:
+  `eval "$(tools/toolchain.sh <scratchpad>/tc)"`. Nothing global.
+- Releases are cut on this PC (`tools/release.sh`, key in `~/.config/cuaderno/signing/`, never
+  in git or Drive) and reach the tablet through the app's update button.
 - The repo is local only. Creating a GitHub remote is Juanma's decision: ask first.
+
+## Check
+
+```bash
+gradle test assembleDebug     # format, kit, own ink (Robolectric); builds the APK
+tools/screens.sh              # real screens to PNG, no device
+claude-budget                 # startup context, goal < 3000 tokens
+```
