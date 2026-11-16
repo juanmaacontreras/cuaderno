@@ -1,0 +1,196 @@
+package com.cuaderno.app
+
+import android.content.Context
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.View
+import com.cuaderno.app.page.PageView
+import com.cuaderno.app.page.Render
+import com.juanma.kit.Ui
+import cuaderno.core.Document
+import cuaderno.core.Notebook
+import cuaderno.core.NotebookFile
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.rules.TemporaryFolder
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+
+/** The page: the pen writes in page points, fingers only move it, and what is written survives. */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-mdpi")
+class PageViewTest {
+    @get:Rule val folder = TemporaryFolder()
+    private val context: Context get() = RuntimeEnvironment.getApplication()
+
+    private fun page(w: Int = 1206, h: Int = 800): PageView {
+        val view = PageView(context, lowLatency = false)
+        view.document = Document(Notebook("n", "t", "c", "m", emptyList()))
+        view.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, w, h)
+        return view
+    }
+
+    private fun line(view: PageView, x0: Float, y0: Float, x1: Float, y1: Float, rub: Boolean = false) {
+        view.penDown(x0, y0, rub)
+        for (i in 1..10) view.penMove(x0 + (x1 - x0) * i / 10, y0 + (y1 - y0) * i / 10)
+        view.penUp()
+    }
+
+    private fun touch(view: PageView, action: Int, x: Float, y: Float, tool: Int, buttons: Int = 0) {
+        val properties = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = tool })
+        val coords = arrayOf(MotionEvent.PointerCoords().apply { this.x = x; this.y = y; pressure = 0.7f })
+        val now = SystemClock.uptimeMillis()
+        val event = MotionEvent.obtain(now, now, action, 1, properties, coords, 0, buttons, 1f, 1f, 0, 0, 0, 0)
+        view.onTouchEvent(event)
+        event.recycle()
+    }
+
+    private fun drag(view: PageView, tool: Int, x0: Float, y0: Float, x1: Float, y1: Float, buttons: Int = 0) {
+        touch(view, MotionEvent.ACTION_DOWN, x0, y0, tool, buttons)
+        touch(view, MotionEvent.ACTION_MOVE, (x0 + x1) / 2, (y0 + y1) / 2, tool, buttons)
+        touch(view, MotionEvent.ACTION_MOVE, x1, y1, tool, buttons)
+        touch(view, MotionEvent.ACTION_UP, x1, y1, tool, buttons)
+    }
+
+    @Test fun theSheetOpensAsWideAsTheScreenAndIsA4() {
+        val view = page()
+        // 1206 px wide, 8 px margins: 1190 px for 595 points.
+        assertEquals(2f, view.scale, 0.001f)
+        assertEquals(8f, view.offsetX, 0.001f)
+        val doc = view.document!!
+        assertEquals(595f, doc.pages[0].width); assertEquals(842f, doc.pages[0].height)
+    }
+
+    @Test fun aStrokeIsKeptInPagePointsWhateverTheZoom() {
+        val view = page()
+        line(view, 208f, 208f, 408f, 208f)
+        val stroke = view.document!!.pages[0].strokes.single()
+        assertEquals(100f, stroke.x(0), 0.01f); assertEquals(100f, stroke.y(0), 0.01f)
+        assertEquals(200f, stroke.x(stroke.size - 1), 0.01f)
+        assertEquals(1.1f, stroke.width)
+        val image = view.snapshot()
+        assertEquals(Ui.BRIGHT, image.getPixel(300, 208))
+        assertNotEquals(Ui.BRIGHT, image.getPixel(300, 230))
+    }
+
+    @Test fun theLineIsAsWideAtAnyPressure() {
+        val view = page()
+        view.widthPt = 1.8f
+        view.penDown(208f, 208f, false, 0, pressure = 0.05f); view.penMove(608f, 208f, 10, pressure = 0.05f); view.penUp()
+        view.penDown(208f, 408f, false, 0, pressure = 1f); view.penMove(608f, 408f, 10, pressure = 1f); view.penUp()
+        val image = view.snapshot()
+        fun thickness(y: Int) = (y - 10..y + 10).count { image.getPixel(400, it) == Ui.BRIGHT }
+        assertTrue(thickness(208) > 0)
+        assertEquals(thickness(208), thickness(408))
+        // What the pen reported is still kept, for a brush that wants it later.
+        assertEquals(1f, view.document!!.pages[0].strokes[1].pressure(0))
+    }
+
+    @Test fun aFingerMovesThePageAndNeverWrites() {
+        val view = page()
+        line(view, 208f, 208f, 408f, 208f)
+        val before = view.offsetY
+        drag(view, MotionEvent.TOOL_TYPE_FINGER, 600f, 600f, 600f, 300f)
+        assertEquals(before - 300f, view.offsetY, 0.5f)
+        assertEquals(1, view.document!!.pages[0].strokes.size)
+        // Dragging down past the top stops at the margin.
+        drag(view, MotionEvent.TOOL_TYPE_FINGER, 600f, 100f, 600f, 700f)
+        drag(view, MotionEvent.TOOL_TYPE_FINGER, 600f, 100f, 600f, 700f)
+        assertEquals(8f, view.offsetY, 0.5f)
+    }
+
+    @Test fun thePenWritesAndItsButtonAndEraserEndRubOut() {
+        val view = page()
+        drag(view, MotionEvent.TOOL_TYPE_STYLUS, 208f, 208f, 408f, 208f)
+        drag(view, MotionEvent.TOOL_TYPE_STYLUS, 208f, 308f, 408f, 308f)
+        assertEquals(2, view.document!!.pages[0].strokes.size)
+        drag(view, MotionEvent.TOOL_TYPE_STYLUS, 300f, 180f, 300f, 240f, MotionEvent.BUTTON_STYLUS_PRIMARY)
+        assertEquals(1, view.document!!.pages[0].strokes.size)
+        drag(view, MotionEvent.TOOL_TYPE_ERASER, 300f, 280f, 300f, 340f)
+        assertTrue(view.document!!.pages[0].strokes.isEmpty())
+        view.document!!.undo(); view.document!!.undo()
+        assertEquals(2, view.document!!.pages[0].strokes.size)
+    }
+
+    @Test fun writingLowerDownLandsOnTheNextPage() {
+        val view = page()
+        line(view, 208f, 208f, 408f, 208f)          // page 1 gets ink, page 2 appears
+        view.scrollBy(0f, -(842f + Render.GAP) * 2f)  // page 2 now where page 1 was
+        line(view, 208f, 208f, 408f, 208f)
+        val pages = view.document!!.pages
+        assertEquals(3, pages.size)
+        assertEquals(100f, pages[1].strokes.single().y(0), 0.01f)
+    }
+
+    @Test fun whatIsWrittenIsOnDiskAfterLeavingAndComesBack() {
+        val file = File(folder.root, "notebooks/cuaderno.cuaderno")
+        val store = Store(file)
+        val view = page()
+        view.document = store.load()
+        line(view, 208f, 208f, 408f, 208f)
+        store.saveNow(view.document!!)
+        assertEquals(1, NotebookFile.read(file).pages[0].strokes.size)
+        val again = Store(file).load()
+        assertEquals(view.document!!.pages[0].strokes, again.pages[0].strokes)
+        assertTrue(File(file.path + ".bak").exists())
+        assertFalse(File(file.path + ".tmp").exists())
+    }
+
+    @Test fun aNotebookThatCannotBeReadIsSetAsideNotOverwritten() {
+        val file = File(folder.root, "notebooks/cuaderno.cuaderno")
+        file.parentFile!!.mkdirs()
+        file.writeText("this is not a notebook")
+        val store = Store(file)
+        val document = store.load()
+        assertEquals(1, document.pages.size)
+        assertTrue(store.problem != null)
+        val aside = file.parentFile!!.listFiles()!!.single { it.name.contains(".ilegible-") }
+        assertEquals("this is not a notebook", aside.readText())
+    }
+
+    /** The PDF itself needs Android's real PDF writer, which the tests do not have: checked on a device. */
+    @Test fun anEmptyNotebookExportsNothing() {
+        val out = File(folder.root, "out.pdf")
+        assertFalse(PdfExport.write(page().document!!.pages, out))
+        assertFalse(out.exists())
+    }
+
+    /** Every recording kept in the repo replays into the strokes that were written. */
+    @Test fun recordingsReplay() {
+        assertTrue(Replay.names().isNotEmpty())
+        for (name in Replay.names()) {
+            val recording = Replay.load(name)
+            val view = page(recording.width, recording.height)
+            Replay.into(view, recording)
+            val written = recording.samples.count { it.action == 'D' && it.tool != 4 && it.buttons and 0x20 == 0 }
+            assertEquals(name, written, view.document!!.pages.sumOf { it.strokes.size })
+        }
+    }
+
+    /**
+     * A guard, not a latency number: what our code spends per pen sample,
+     * which has to stay far below the 4 ms between two samples of a 240 Hz
+     * pen. It fails if a change makes the writing path several times slower.
+     */
+    @Test fun aPenSampleCostsFarLessThanTheTimeBetweenTwo() {
+        val recording = Replay.load("synthetic.csv")
+        val view = page(recording.width, recording.height)
+        Replay.into(view, recording)  // warm up
+        val start = System.nanoTime()
+        repeat(5) { Replay.into(view, recording) }
+        val perSample = (System.nanoTime() - start) / 1e6 / (5 * recording.samples.size)
+        println("pen sample cost: %.4f ms".format(perSample))
+        assertTrue("a pen sample costs $perSample ms", perSample < 1.0)
+    }
+}

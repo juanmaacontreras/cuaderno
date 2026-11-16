@@ -5,6 +5,30 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **Writing screen: layout C, tools down the left edge** (origen: Juanma: it is how he has
+  Samsung Notes). The title, page number and widths that do not fit go elsewhere: widths
+  open by tapping the pen in use.
+- **Pages are A4** (origen: Juanma: what he always used, and it exports cleanly to PDF).
+  The notebook is A4 sheets one under the other; writing on the last adds the next.
+- **The line has a fixed width; pressure is not drawn** (origen: Juanma: he turns pressure
+  off in Samsung Notes). Pressure, tilt and time are still stored with each sample.
+- **Paper: dark, squared, by default** (origen: Claude; he did not answer dark or light).
+  The colour is the app's, not the file's: format 1 stores the pattern only. An exported
+  PDF comes out dark too; a light export for printing is open.
+- **The pen writes; fingers move and zoom** (origen: Claude, he did not object). A finger
+  that lands while the pen is down is the hand and is ignored until it lifts; a finger
+  drag that the pen interrupts is put back.
+- **`CanvasFrontBufferedRenderer`, not `LowLatencyCanvasView`** (origen: Claude, found on
+  the emulator). The second keeps one image and only adds to it: nothing redraws on undo,
+  erase or scroll. The first has two layers (stroke in progress in front, the notebook
+  behind). So the bench's "Baja latencia" in v5 could not show undo or the eraser; its
+  writing delay, which is what was compared, came from the same front-buffer path.
+  Redraws of the notebook are limited to one per frame and one in flight: the library
+  stalls when every finger sample asks for one.
+- **Phase 1, first slice shipped**: pen, eraser by stroke (tool, pen button, eraser end),
+  undo/redo, move and zoom, autosave, PDF export. Not yet: highlighter, partial eraser,
+  rendering cache for long notebooks (every redraw draws all visible strokes).
+
 - **Engine chosen: our own stroke through the front buffer ("Baja latencia")** (origen:
   Juanma, on Claude's recommendation). Jetpack Ink and "Clásico" leave the app in phase 1.
 - **Battery** (origen: Juanma): the app may spend what writing needs, but nothing
