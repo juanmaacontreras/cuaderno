@@ -20,13 +20,13 @@ Updated: 2026-11-16. Read with `CLAUDE.md` at the start of a session; update at 
 - **Nothing has run on the tablet**: pressure, palm rejection with the real S-Pen, the pen
   button and, above all, how it feels are untested there. If an engine fails to start, the
   bench says so and falls back to Clásico.
-- No release yet: there is no GitHub repo (his decision) and no signing key.
+- Released from the first push on (GitHub Releases, signed with the Cuaderno key).
 
 ## Next
 
-1. Juanma: the four open decisions (`plan.md` section 10), above all the GitHub repo,
-   without which the app cannot reach the tablet.
-2. First release; he writes with the three engines against Samsung Notes and picks.
+1. Juanma installs the first release on the tablet, writes with the three engines against
+   Samsung Notes and picks.
+2. The three open decisions left (`plan.md` section 10: name, paper, what he really uses).
 3. He records a real page; it goes to `app/src/test/resources/recordings/`.
 4. Survey of what he really uses in Samsung Notes, written into `plan.md` section 3.
 5. Design of the writing screen as rendered variants (dark), for his OK. That closes phase 0.

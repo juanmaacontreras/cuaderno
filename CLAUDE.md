@@ -30,7 +30,9 @@ https://claude.ai/artifact/PHQmVerxfbkkCipzxGaF2d
   `eval "$(tools/toolchain.sh <scratchpad>/tc)"`. Nothing global.
 - Releases are cut on this PC (`tools/release.sh`, key in `~/.config/cuaderno/signing/`, never
   in git or Drive) and reach the tablet through the app's update button.
-- The repo is local only. Creating a GitHub remote is Juanma's decision: ask first.
+- The repo is public (github.com/juanmaacontreras/cuaderno) so the app can update itself:
+  nothing secret or personal goes in it, and notes never do. Branch + PR per change; a merged
+  change that touches the app is followed by a release.
 
 ## Check
 

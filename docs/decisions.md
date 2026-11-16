@@ -5,6 +5,8 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **Public GitHub repo created** (origen: Juanma, "sí, creá el repo"), for the updater.
+  Signing key generated in `~/.config/cuaderno/signing/`: losing it means reinstalling.
 - **Phase 0 started without the plan being formally approved** (origen: Juanma, "quiero que
   encares el proyecto"). The four open decisions of `plan.md` section 10 are still his.
 - **Built by Fable in this session**, not by another model as the plan assumed (origen:
