@@ -7,6 +7,9 @@ object Strings {
     const val EXPORT_FAILED = "No se pudo armar el PDF"
     const val EXPORT_SHARE = "Mandar el PDF"
 
+    const val PAPER_DARK = "Papel oscuro"
+    const val PAPER_LIGHT = "Papel claro"
+
     const val RECORD = "Grabar trazos"
     const val RECORD_STOP = "Parar la grabación y mandarla"
     const val RECORD_EMPTY = "No se grabó ningún trazo"

@@ -12,7 +12,6 @@ import cuaderno.core.Notebook
 import cuaderno.core.NotebookFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -80,8 +79,8 @@ class PageViewTest {
         assertEquals(200f, stroke.x(stroke.size - 1), 0.01f)
         assertEquals(1.1f, stroke.width)
         val image = view.snapshot()
-        assertEquals(Ui.BRIGHT, image.getPixel(300, 208))
-        assertNotEquals(Ui.BRIGHT, image.getPixel(300, 230))
+        assertEquals(Ui.BG, image.getPixel(300, 208))
+        assertEquals(Ui.BRIGHT, image.getPixel(300, 240))
     }
 
     @Test fun theLineIsAsWideAtAnyPressure() {
@@ -90,11 +89,28 @@ class PageViewTest {
         view.penDown(208f, 208f, false, 0, pressure = 0.05f); view.penMove(608f, 208f, 10, pressure = 0.05f); view.penUp()
         view.penDown(208f, 408f, false, 0, pressure = 1f); view.penMove(608f, 408f, 10, pressure = 1f); view.penUp()
         val image = view.snapshot()
-        fun thickness(y: Int) = (y - 10..y + 10).count { image.getPixel(400, it) == Ui.BRIGHT }
+        fun thickness(y: Int) = (y - 10..y + 10).count { image.getPixel(400, it) == Ui.BG }
         assertTrue(thickness(208) > 0)
         assertEquals(thickness(208), thickness(408))
         // What the pen reported is still kept, for a brush that wants it later.
         assertEquals(1f, view.document!!.pages[0].strokes[1].pressure(0))
+    }
+
+    @Test fun thePaperCanBeLightOrDarkAndPlainInkFollowsIt() {
+        val view = page()
+        line(view, 208f, 208f, 408f, 208f)
+        assertEquals(Ui.BG, view.snapshot().getPixel(300, 208))      // dark ink on light paper
+        view.darkPaper = true
+        val dark = view.snapshot()
+        assertEquals(Ui.BRIGHT, dark.getPixel(300, 208))             // the same stroke, light on dark
+        assertEquals(Ui.BG, dark.getPixel(300, 240))
+        // The file keeps what was written, whatever paper shows it.
+        assertEquals(Ui.BG, view.document!!.pages[0].strokes[0].color)
+        view.color = Ui.RED
+        line(view, 208f, 308f, 408f, 308f)
+        assertEquals(Ui.RED, view.snapshot().getPixel(300, 308))
+        view.darkPaper = false
+        assertEquals(Ui.RED, view.snapshot().getPixel(300, 308))
     }
 
     @Test fun aFingerMovesThePageAndNeverWrites() {

@@ -12,6 +12,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import com.cuaderno.app.page.PageView
+import com.cuaderno.app.page.Render
 import com.juanma.kit.Ui
 import com.juanma.kit.Updater
 import cuaderno.core.Document
@@ -24,7 +25,9 @@ import kotlin.concurrent.thread
  * is one notebook; the library comes in phase 2.
  */
 class WriteActivity : Activity() {
-    private val colors = listOf(Ui.BRIGHT, Ui.ACCENT, Ui.RED, Ui.GREEN, Ui.YELLOW)
+    /** The first is the paper's plain ink; the rest read on both papers. */
+    private val colors get() = listOf(Render.ink(page.darkPaper), Ui.ACCENT_DEEP, Ui.RED, Ui.GREEN_DEEP, Ui.ORANGE)
+    private val prefs by lazy { getSharedPreferences("cuaderno", MODE_PRIVATE) }
     /** Line widths in page points: about 0.25, 0.4 and 0.65 mm on paper. */
     private val widths = listOf(0.7f, 1.1f, 1.8f)
     private val updater = Updater("juanmaacontreras/cuaderno")
@@ -48,6 +51,9 @@ class WriteActivity : Activity() {
 
         page = PageView(this, lowLatency)
         page.document = document
+        // Light paper unless he chose dark (Juanma, 2026-11-16: light is what he is used to).
+        page.darkPaper = prefs.getBoolean("dark_paper", false)
+        page.color = Render.ink(page.darkPaper)
         page.onChange = {
             store.saveSoon(document)
             renderBar()
@@ -126,7 +132,8 @@ class WriteActivity : Activity() {
         })
         bar.addView(space(10f))
         for (option in colors) {
-            bar.addView(Ui.swatch(this, option, 22f, !page.erasing && page.color == option) {
+            val current = Render.shown(page.color, page.darkPaper) == option
+            bar.addView(Ui.swatch(this, option, 22f, !page.erasing && current) {
                 page.color = option
                 page.erasing = false
                 renderBar()
@@ -161,11 +168,17 @@ class WriteActivity : Activity() {
     private fun menu(anchor: View) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, 1, 0, Strings.EXPORT)
-        popup.menu.add(0, 2, 1, if (recorder.recording) Strings.RECORD_STOP else Strings.RECORD)
+        popup.menu.add(0, 3, 1, if (page.darkPaper) Strings.PAPER_LIGHT else Strings.PAPER_DARK)
+        popup.menu.add(0, 2, 2, if (recorder.recording) Strings.RECORD_STOP else Strings.RECORD)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> export()
                 2 -> if (recorder.recording) stopRecording() else recorder.begin()
+                3 -> {
+                    page.darkPaper = !page.darkPaper
+                    prefs.edit().putBoolean("dark_paper", page.darkPaper).apply()
+                    renderBar()
+                }
             }
             true
         }
@@ -181,9 +194,10 @@ class WriteActivity : Activity() {
 
     private fun export() {
         val pages = document.pages
+        val dark = page.darkPaper
         val file = File(cacheDir, "exports/cuaderno.pdf")
         thread(name = "cuaderno-export") {
-            val done = try { PdfExport.write(pages, file) } catch (e: Exception) { null }
+            val done = try { PdfExport.write(pages, file, dark) } catch (e: Exception) { null }
             runOnUiThread {
                 when (done) {
                     true -> share(file, "application/pdf", Strings.EXPORT_SHARE)

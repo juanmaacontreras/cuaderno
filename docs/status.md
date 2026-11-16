@@ -6,9 +6,9 @@ Updated: 2026-11-16. Read with `CLAUDE.md` at the start of a session; update at 
 
 **Phase 0 closed. Phase 1 (write a page), first slice released.**
 
-The app opens on one notebook of A4 squared sheets, dark. Tools down the left edge: pen
+The app opens on one notebook of A4 squared sheets, light (dark from the menu). Tools down the left edge: pen
 (tap it again for the three widths), eraser, five colours, undo, redo, menu (export to PDF,
-record pen strokes). The pen writes a fixed-width line; fingers move and zoom. Everything
+paper light or dark, record pen strokes). The pen writes a fixed-width line; fingers move and zoom. Everything
 is saved 1.5 s after a change and when leaving the screen, in `files/notebooks/
 cuaderno.cuaderno` (format 1, atomic), with the last file that opened well kept as `.bak`.
 
@@ -24,14 +24,16 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 - On an Android 34 emulator at the tablet's size, with adb's simulated stylus and finger:
   writing, undo, redo, eraser, finger scroll (exact to the pixel), reopening after a forced
   stop with the strokes still there, and the exported PDF (one A4 page, opened and looked at).
-- **Not on the tablet yet**: the real S-Pen (button, palm while writing), pinch zoom (adb
+- The light paper change (colours only) was checked by tests and renders, not on the emulator.
+- **Not confirmed on the tablet yet**: the real S-Pen (button, palm while writing), pinch zoom (adb
   cannot pinch), how it feels, battery.
 
 ## Next
 
-1. Juanma writes a class with it next to Samsung Notes and says what is wrong or missing.
+1. Juanma used v8 ("la uso bien, vamos por buen camino") and notices differences with
+   Samsung Notes: get the list from him and order it.
 2. Rest of phase 1: highlighter, partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.
-3. Still open: the name, dark or light paper (dark assumed), what else he really uses in
+3. Still open: the name, what else he really uses in
    Samsung Notes (`plan.md` section 3 has what he said so far), and a real pen recording
    (menu, "Grabar trazos") for the tests.

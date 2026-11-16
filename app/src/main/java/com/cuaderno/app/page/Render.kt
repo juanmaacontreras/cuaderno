@@ -16,13 +16,16 @@ import cuaderno.core.Stroke
  * Not thread-safe: each thread that draws has its own Render.
  */
 class Render {
+    /** Dark sheet with light ink, or a light sheet like paper. Set before drawing. */
+    var dark = false
+
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val rule = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = RULE; strokeWidth = 0.5f }
-    private val fill = Paint().apply { color = PAPER }
+    private val rule = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 0.5f }
+    private val fill = Paint()
     private val path = Path()
 
     /** The whole notebook, pages one under the other, as far as [top]..[bottom] (points) is visible. */
@@ -43,6 +46,8 @@ class Render {
     fun page(canvas: Canvas, page: Page) {
         canvas.save()
         canvas.clipRect(0f, 0f, page.width, page.height)
+        fill.color = if (dark) PAPER_DARK else PAPER_LIGHT
+        rule.color = if (dark) RULE_DARK else RULE_LIGHT
         canvas.drawRect(0f, 0f, page.width, page.height, fill)
         paper(canvas, page)
         for (stroke in page.strokes) stroke(canvas, stroke)
@@ -79,7 +84,7 @@ class Render {
      * in the stroke but not drawn: Juanma writes with a fixed-width line.
      */
     fun stroke(canvas: Canvas, stroke: Stroke) {
-        ink.color = stroke.color
+        ink.color = shown(stroke.color, dark)
         ink.strokeWidth = stroke.width
         if (stroke.size == 1) {
             canvas.drawPoint(stroke.x(0), stroke.y(0), ink)
@@ -102,8 +107,26 @@ class Render {
         /** 5 mm squares; 8 mm lines. */
         const val GRID = 14.17f
         const val LINE = 22.68f
-        const val PAPER = Ui.BG
-        const val RULE = Ui.SURFACE
+        const val PAPER_DARK = Ui.BG
+        const val RULE_DARK = Ui.SURFACE
+        const val PAPER_LIGHT = Ui.BRIGHT
+        const val RULE_LIGHT = 0xFFD3D9E4.toInt()
+        /** The plain ink of each paper: near-black on light, near-white on dark. */
+        const val INK_ON_LIGHT = Ui.BG
+        const val INK_ON_DARK = Ui.BRIGHT
+
+        fun ink(dark: Boolean) = if (dark) INK_ON_DARK else INK_ON_LIGHT
+
+        /**
+         * The colour a stroke is drawn in. Plain ink written on one paper
+         * would vanish on the other, so it is shown as the other's plain
+         * ink; the file keeps what was written. Other colours stay.
+         */
+        fun shown(color: Int, dark: Boolean): Int = when {
+            dark && color == INK_ON_LIGHT -> INK_ON_DARK
+            !dark && color == INK_ON_DARK -> INK_ON_LIGHT
+            else -> color
+        }
         /** What shows around and between the sheets. */
         const val DESK = 0xFF242933.toInt()
 

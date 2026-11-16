@@ -12,7 +12,6 @@ import android.view.SurfaceView
 import androidx.graphics.surface.SurfaceControlCompat
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
-import com.juanma.kit.Ui
 import cuaderno.core.Document
 import cuaderno.core.StrokeBuilder
 import cuaderno.core.Tool
@@ -52,7 +51,14 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             field = value
             display.redraw()
         }
-    var color = Ui.BRIGHT
+    var color = Render.INK_ON_LIGHT
+
+    /** Dark sheet with light ink, or light like paper. Only how it is shown: the file does not change. */
+    @Volatile var darkPaper = false
+        set(value) {
+            field = value
+            display.redraw()
+        }
     /** Line width in page points. */
     var widthPt = 1.1f
     var erasing = false
@@ -210,7 +216,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
         count = 1
         lastX = x; lastY = y
-        display.add(Piece(color, widthPt * scale, x, y, x, y, x, y, line = true))
+        display.add(Piece(Render.shown(color, darkPaper), widthPt * scale, x, y, x, y, x, y, line = true))
     }
 
     fun penMove(x: Float, y: Float, timeMs: Long = 0, pressure: Float = 0.5f, tilt: Float = 0f, orientation: Float = 0f) {
@@ -224,7 +230,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         // The curve between the midpoints around the previous sample: the same shape Render draws later.
         val fromX = if (count == 1) lastX else (beforeX + lastX) / 2
         val fromY = if (count == 1) lastY else (beforeY + lastY) / 2
-        display.add(Piece(color, widthPt * scale, fromX, fromY, lastX, lastY, (lastX + x) / 2, (lastY + y) / 2, line = false))
+        display.add(Piece(Render.shown(color, darkPaper), widthPt * scale, fromX, fromY, lastX, lastY, (lastX + x) / 2, (lastY + y) / 2, line = false))
         beforeX = lastX; beforeY = lastY
         lastX = x; lastY = y
         count++
@@ -365,6 +371,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         canvas.save()
         canvas.translate(offsetX, y)
         canvas.scale(s, s)
+        brush.render.dark = darkPaper
         brush.render.pages(canvas, pages, -y / s, (height - y) / s)
         canvas.restore()
     }
