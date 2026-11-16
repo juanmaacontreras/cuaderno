@@ -5,6 +5,12 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **Paper is light by default, dark by choice** (origen: Juanma: light is what he is used
+  to, and he wants to be able to choose). Menu, "Papel oscuro / Papel claro"; an app
+  setting, not part of the file. Plain ink follows the paper (near-black on light,
+  near-white on dark) when shown; the file keeps the colour written. The PDF comes out on
+  the paper in use. The tool bar stays dark. This replaces "dark by default" below.
+
 - **Writing screen: layout C, tools down the left edge** (origen: Juanma: it is how he has
   Samsung Notes). The title, page number and widths that do not fit go elsewhere: widths
   open by tapping the pen in use.

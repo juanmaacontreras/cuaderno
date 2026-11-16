@@ -11,11 +11,11 @@ import java.io.File
  * whatever happens to Cuaderno, the notes can leave as a PDF.
  */
 object PdfExport {
-    /** Writes the pages that have something on them; false if there are none. */
-    fun write(pages: List<Page>, out: File): Boolean {
+    /** Writes the pages that have something on them, on the paper being used; false if there are none. */
+    fun write(pages: List<Page>, out: File, dark: Boolean = false): Boolean {
         val written = pages.filter { it.strokes.isNotEmpty() }
         if (written.isEmpty()) return false
-        val render = Render()
+        val render = Render().also { it.dark = dark }
         val pdf = PdfDocument()
         try {
             for ((i, page) in written.withIndex()) {

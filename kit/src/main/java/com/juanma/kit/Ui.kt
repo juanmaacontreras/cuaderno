@@ -35,6 +35,10 @@ object Ui {
     const val RED = 0xFFBF616A.toInt()
     const val GREEN = 0xFFA3BE8C.toInt()
     const val YELLOW = 0xFFEBCB8B.toInt()
+    // Nord's deeper tones: they read on a light surface as well as a dark one.
+    const val ACCENT_DEEP = 0xFF5E81AC.toInt()
+    const val GREEN_DEEP = 0xFF7FA05F.toInt()
+    const val ORANGE = 0xFFD08770.toInt()
 
     fun dp(context: Context, value: Float): Int =
         (value * context.resources.displayMetrics.density + 0.5f).toInt()
