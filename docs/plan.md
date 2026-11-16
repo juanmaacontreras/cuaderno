@@ -25,6 +25,29 @@ Es **un proyecto aparte y una app aparte** (origen: Juanma). La vinculación con
 dispositivos y con el resto del ecosistema se ve **recién cuando ande** (origen: Juanma):
 ver la fase 6, que no se empieza antes.
 
+## Prioridad número uno: cómo se siente escribir
+
+**La sensación de escritura va antes que todo lo demás** (origen: Juanma, 2026-11-15):
+"necesito optimizar todo para lograr el mínimo delay posible y que se sienta cómodo".
+
+Qué significa para quien construye (origen: Claude):
+
+- **Es el criterio que desempata.** Si una función nueva agrega retraso al trazo o lo
+  vuelve menos cómodo, no entra hasta que deje de hacerlo. Ninguna fase se da por buena
+  si escribir quedó peor que en la anterior.
+- **Primero el trazo, después la app.** Las fases 0 y 1 son sobre todo esto: buffer
+  frontal, predicción del movimiento, todas las muestras del lápiz sin esperar al cuadro,
+  nada de trabajo pesado en el hilo que dibuja (ni guardar, ni recalcular miniaturas).
+- **Cómodo es más que rápido:** que el grosor responda a la presión sin saltos, que la
+  línea no tiemble ni se redondee de más, que la palma nunca manche, que el botón del
+  lápiz borre al instante, que el zoom con dos dedos no deje marcas.
+- **Se mide, además de sentirse.** Juanma juzga con la tablet contra Samsung Notes; al
+  lado va un número repetible (retraso del trazo con la grabación de trazos reales, y
+  video en cámara lenta del lápiz contra la tinta cuando haga falta) para saber si un
+  cambio mejoró o empeoró sin depender de la memoria.
+- **Se cuida en cada cambio.** Un test de rendimiento del trazo corre con los demás y
+  avisa si un PR lo empeora.
+
 ## 2. Por qué ahora
 
 - 2026-11-15 a la mañana: recomendé no clonar Samsung Notes y probar primero el trazo
@@ -204,8 +227,8 @@ semana con el plan Pro.
 
 | Fase | Qué entrega | Se da por buena cuando |
 |---|---|---|
-| **0. Bases** | Repo, tests y chequeos automáticos, publicación con actualizador, relevamiento de qué usa de Samsung Notes, comparación de los dos motores de tinta en la tablet, formato de archivo escrito | Juanma eligió el motor escribiendo con los dos y aprobó el diseño de la pantalla de escritura |
-| **1. Escribir una página** | Lápiz y resaltador con presión, goma (por trazo y parcial), deshacer y rehacer, zoom y desplazamiento con dos dedos, rechazo de palma, guardado automático, exportar a PDF | Toma los apuntes de una clase entera y no pierde nada, ni cerrando la app a la fuerza |
+| **0. Bases** | Repo, tests y chequeos automáticos, publicación con actualizador, relevamiento de qué usa de Samsung Notes, comparación de los dos motores de tinta en la tablet, formato de archivo escrito | Juanma eligió el motor escribiendo con los dos (gana el que se siente mejor, no el que trae más funciones), hay una medición del retraso del trazo, y aprobó el diseño de la pantalla de escritura |
+| **1. Escribir una página** | Lápiz y resaltador con presión, goma (por trazo y parcial), deshacer y rehacer, zoom y desplazamiento con dos dedos, rechazo de palma, guardado automático, exportar a PDF | Escribir se siente igual o mejor que en Samsung Notes (lo dice Juanma), toma los apuntes de una clase entera y no pierde nada, ni cerrando la app a la fuerza |
 | **2. Cuadernos** | Páginas (agregar, borrar, reordenar, miniaturas), papeles (liso, rayado, cuadriculado, punteado), biblioteca con carpetas por materia, papelera | Usa la app una semana de cursada en paralelo con Samsung Notes |
 | **3. Lazo y formas** | Seleccionar, mover, escalar, recolorear, copiar entre páginas; formas que se enderezan; pegar imágenes | Rehace un ejercicio reacomodando partes sin reescribir |
 | **4. PDF** | Importar, anotar, miniaturas e índice, favoritos, exportar anotado | Resuelve una guía de cátedra completa encima del PDF. **Acá debería poder dejar Samsung Notes** |
