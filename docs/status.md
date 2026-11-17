@@ -30,9 +30,10 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 
 ## Next
 
-1. Juanma used v8 ("la uso bien, vamos por buen camino") and notices differences with
-   Samsung Notes: get the list from him and order it.
-2. Rest of phase 1: highlighter, partial eraser, a rendering cache (tiles) before notebooks
+1. Juanma tries v10 (spring-back zoom, coasting, eraser circle, full screen) and says how
+   it compares; pinch and hover were only checked by tests, not with real fingers and pen.
+2. Rest of phase 1: straight line / circle when the pen is held at the end of a stroke
+   (he asked for it), highlighter, partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.
 3. Still open: the name, what else he really uses in
    Samsung Notes (`plan.md` section 3 has what he said so far), and a real pen recording

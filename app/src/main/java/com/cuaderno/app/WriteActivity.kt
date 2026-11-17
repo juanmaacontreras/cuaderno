@@ -5,6 +5,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupMenu
@@ -54,6 +56,8 @@ class WriteActivity : Activity() {
         // Light paper unless he chose dark (Juanma, 2026-11-16: light is what he is used to).
         page.darkPaper = prefs.getBoolean("dark_paper", false)
         page.color = Render.ink(page.darkPaper)
+        // Starting to write puts the widths away: the page is for writing, not for a panel in the way.
+        page.onPenDown = { if (widthPanel.visibility == View.VISIBLE) widthPanel.visibility = View.GONE }
         page.onChange = {
             store.saveSoon(document)
             renderBar()
@@ -94,6 +98,21 @@ class WriteActivity : Activity() {
         })
         renderBar()
         showProblem(store.problem?.let { Strings.UNREADABLE + it })
+    }
+
+    /**
+     * The whole screen is the page: no clock and icons above, no gesture line
+     * below (as Samsung Notes does). A swipe from the edge brings them back
+     * for a moment. Asked again on focus because a dialog or the keyboard
+     * returns them.
+     */
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus) return
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun onResume() {
