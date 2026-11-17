@@ -5,6 +5,15 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **"Not as fluid as Samsung Notes" when the page moves** (origen: Juanma, on v10). Not
+  measured on the tablet, so the cause is a guess (origen: Claude) and three cheap things
+  went in: the window asks for the screen's fastest mode (a surface fed irregularly can be
+  left at 60 Hz); a stroke's path is built once, not on every frame; strokes off screen
+  are skipped. Menu, "Medir fluidez", shows frames per second, the slowest frame and the
+  screen's rate while the page moves: **his numbers decide the next step**. If frames stay
+  well under the screen's rate, the redraw through the library is the limit and the page
+  needs cached tiles or an ordinary view for the settled notebook.
+
 - **What Juanma noticed using v9 next to Samsung Notes, and what was done** (origen: Juanma):
   - Zoom out follows the fingers below the screen's width (down to half) and springs back
     to the full sheet on release. Zoom in stays.

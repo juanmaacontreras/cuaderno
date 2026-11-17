@@ -30,8 +30,8 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 
 ## Next
 
-1. Juanma tries v10 (spring-back zoom, coasting, eraser circle, full screen) and says how
-   it compares; pinch and hover were only checked by tests, not with real fingers and pen.
+1. Fluency: he found v10 less fluid than Samsung Notes. v11 has a first attempt and a
+   readout (menu, "Medir fluidez"). Get his numbers while scrolling before changing more.
 2. Rest of phase 1: straight line / circle when the pen is held at the end of a stroke
    (he asked for it), highlighter, partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.

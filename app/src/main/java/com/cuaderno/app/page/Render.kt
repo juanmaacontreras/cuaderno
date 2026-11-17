@@ -26,7 +26,10 @@ class Render {
     }
     private val rule = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 0.5f }
     private val fill = Paint()
-    private val path = Path()
+    // A stroke never changes, so its path is built once and kept while the stroke is
+    // around: moving the page redraws every visible stroke on every frame. By identity,
+    // not content: comparing strokes sample by sample would cost more than it saves.
+    private val paths = java.util.IdentityHashMap<Stroke, Path>()
 
     /** The whole notebook, pages one under the other, as far as [top]..[bottom] (points) is visible. */
     fun pages(canvas: Canvas, pages: List<Page>, top: Float, bottom: Float) {
@@ -35,7 +38,7 @@ class Render {
             if (y + page.height >= top && y <= bottom) {
                 canvas.save()
                 canvas.translate(0f, y)
-                page(canvas, page)
+                page(canvas, page, top - y, bottom - y)
                 canvas.restore()
             }
             y += page.height + GAP
@@ -43,14 +46,19 @@ class Render {
     }
 
     /** One page with its origin at the canvas origin. Ink is clipped to the sheet. */
-    fun page(canvas: Canvas, page: Page) {
+    fun page(canvas: Canvas, page: Page, top: Float = 0f, bottom: Float = page.height) {
         canvas.save()
         canvas.clipRect(0f, 0f, page.width, page.height)
         fill.color = if (dark) PAPER_DARK else PAPER_LIGHT
         rule.color = if (dark) RULE_DARK else RULE_LIGHT
         canvas.drawRect(0f, 0f, page.width, page.height, fill)
         paper(canvas, page)
-        for (stroke in page.strokes) stroke(canvas, stroke)
+        for (stroke in page.strokes) {
+            // Zoomed in, most of a page's strokes are off screen: skip them.
+            val b = stroke.bounds
+            if (b[3] + stroke.width < top || b[1] - stroke.width > bottom) continue
+            stroke(canvas, stroke)
+        }
         canvas.restore()
     }
 
@@ -90,7 +98,13 @@ class Render {
             canvas.drawPoint(stroke.x(0), stroke.y(0), ink)
             return
         }
-        path.rewind()
+        canvas.drawPath(paths[stroke] ?: build(stroke), ink)
+    }
+
+    private fun build(stroke: Stroke): Path {
+        // Erased and undone strokes pile up here; start again now and then rather than track them.
+        if (paths.size > MAX_PATHS) paths.clear()
+        val path = Path()
         path.moveTo(stroke.x(0), stroke.y(0))
         for (i in 1 until stroke.size) {
             val ax = stroke.x(i - 1)
@@ -98,12 +112,14 @@ class Render {
             path.quadTo(ax, ay, (ax + stroke.x(i)) / 2, (ay + stroke.y(i)) / 2)
         }
         path.lineTo(stroke.x(stroke.size - 1), stroke.y(stroke.size - 1))
-        canvas.drawPath(path, ink)
+        paths[stroke] = path
+        return path
     }
 
     companion object {
         /** Points between one page and the next on screen. */
         const val GAP = 14f
+        private const val MAX_PATHS = 20000
         /** 5 mm squares; 8 mm lines. */
         const val GRID = 14.17f
         const val LINE = 22.68f

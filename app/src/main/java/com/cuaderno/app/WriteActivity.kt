@@ -109,9 +109,26 @@ class WriteActivity : Activity() {
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (!hasFocus) return
+        fastestScreen()
         WindowInsetsControllerCompat(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    /**
+     * Asks for the screen's fastest mode at its current size (90 Hz on the Tab S10 FE).
+     * The page is drawn on its own surface, and Android picks the refresh rate from how
+     * regularly a surface is fed: without asking, it can settle on 60 for this one.
+     */
+    private fun fastestScreen() {
+        @Suppress("DEPRECATION") val display = windowManager.defaultDisplay ?: return  // Activity.display needs API 30
+        val now = display.mode
+        val best = display.supportedModes
+            .filter { it.physicalWidth == now.physicalWidth && it.physicalHeight == now.physicalHeight }
+            .maxByOrNull { it.refreshRate } ?: return
+        if (window.attributes.preferredDisplayModeId != best.modeId) {
+            window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
         }
     }
 
@@ -189,10 +206,17 @@ class WriteActivity : Activity() {
         popup.menu.add(0, 1, 0, Strings.EXPORT)
         popup.menu.add(0, 3, 1, if (page.darkPaper) Strings.PAPER_LIGHT else Strings.PAPER_DARK)
         popup.menu.add(0, 2, 2, if (recorder.recording) Strings.RECORD_STOP else Strings.RECORD)
+        popup.menu.add(0, 4, 3, if (page.onFluency != null) Strings.FLUENCY_STOP else Strings.FLUENCY)
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> export()
                 2 -> if (recorder.recording) stopRecording() else recorder.begin()
+                4 -> if (page.onFluency != null) {
+                    page.onFluency = null
+                    showProblem(null)
+                } else {
+                    page.onFluency = { frames, worst, hz -> showProblem(Strings.fluency(frames, worst, hz)) }
+                }
                 3 -> {
                     page.darkPaper = !page.darkPaper
                     prefs.edit().putBoolean("dark_paper", page.darkPaper).apply()
