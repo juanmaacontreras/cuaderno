@@ -5,6 +5,19 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **What Juanma noticed using v9 next to Samsung Notes, and what was done** (origen: Juanma):
+  - Zoom out follows the fingers below the screen's width (down to half) and springs back
+    to the full sheet on release. Zoom in stays.
+  - The page coasts after a flick instead of stopping dead (`OverScroller`, one step per
+    frame, nothing running once still); a touch stops it.
+  - The eraser shows a circle of the size it rubs out, while rubbing and while the pen
+    hovers with the eraser on. It is an ordinary view above the page, not the front buffer.
+  - The widths panel closes when the pen touches the page.
+  - Full screen: the status bar and the gesture line are hidden; a swipe from the edge
+    shows them for a moment.
+  - **Later, asked for**: hold the pen still at the end of a stroke to turn it into a
+    straight line or a clean circle (shape recognition). He said it can wait.
+
 - **Paper is light by default, dark by choice** (origen: Juanma: light is what he is used
   to, and he wants to be able to choose). Menu, "Papel oscuro / Papel claro"; an app
   setting, not part of the file. Plain ink follows the paper (near-black on light,

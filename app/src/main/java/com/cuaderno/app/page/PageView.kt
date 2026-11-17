@@ -4,7 +4,13 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
+import android.animation.ValueAnimator
+import android.view.Choreographer
 import android.view.MotionEvent
+import android.view.VelocityTracker
+import android.view.ViewConfiguration
+import android.view.animation.DecelerateInterpolator
+import android.widget.OverScroller
 import android.view.View
 import android.widget.FrameLayout
 import android.os.SystemClock
@@ -66,6 +72,9 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** Called on the main thread after the notebook changes. */
     var onChange: (() -> Unit)? = null
 
+    /** Called when the pen touches the page, to put away whatever was open over it. */
+    var onPenDown: (() -> Unit)? = null
+
     @Volatile var scale = 0f
         private set
     @Volatile var offsetX = 0f
@@ -97,12 +106,20 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     private var startCx = 0f
     private var startCy = 0f
     private var startSpan = 0f
+    private var tracker: VelocityTracker? = null
+    private val scroller = OverScroller(context)
+    private var settling: ValueAnimator? = null
+    private val ring = Ring()
+
+    /** Whether the eraser's circle is on screen (for the tests). */
+    val ringShown: Boolean get() = ring.shown
 
     private val display: Display = if (lowLatency) FrontBuffer() else Buffered()
 
     init {
         setBackgroundColor(Render.DESK)
         addView(display.view, LayoutParams(-1, -1))
+        addView(ring, LayoutParams(-1, -1))
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -127,6 +144,12 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val index = event.actionIndex
+        // Touching the page stops it where it is.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) stopMotion()
+        if (penId == -1 && !isPen(event, index)) {
+            if (tracker == null) tracker = VelocityTracker.obtain()
+            tracker?.addMovement(event)
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 if (isPen(event, index)) {
@@ -176,7 +199,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 ignored.remove(id)
                 if (event.actionMasked == MotionEvent.ACTION_UP) {
                     ignored.clear()
+                    if (gesture) release()
                     gesture = false
+                    tracker?.recycle()
+                    tracker = null
                 } else {
                     rebase(event, index)
                 }
@@ -185,9 +211,27 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 if (penId != -1) penCancel()
                 penId = -1
                 ignored.clear()
+                if (gesture) release()
                 gesture = false
+                tracker?.recycle()
+                tracker = null
             }
         }
+        return true
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        stopMotion()
+    }
+
+    override fun onInterceptHoverEvent(event: MotionEvent) = true
+
+    /** The pen near the page with the eraser on shows where it would rub out. */
+    override fun onHoverEvent(event: MotionEvent): Boolean {
+        val rub = isPen(event, 0) && (erasing || event.getToolType(0) == MotionEvent.TOOL_TYPE_ERASER ||
+            (event.buttonState and MotionEvent.BUTTON_STYLUS_PRIMARY) != 0)
+        if (rub && event.actionMasked != MotionEvent.ACTION_HOVER_EXIT) ring.show(event.x, event.y) else ring.hide()
         return true
     }
 
@@ -201,6 +245,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     fun penDown(x: Float, y: Float, rub: Boolean = erasing, timeMs: Long = 0, pressure: Float = 0.5f,
                 tilt: Float = 0f, orientation: Float = 0f) {
         val doc = document ?: return
+        onPenDown?.invoke()
         val pages = doc.pages
         strokePage = Render.pageAt(pages, (y - offsetY) / scale)
         strokeTop = Render.top(pages, strokePage)
@@ -239,6 +284,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     fun penUp() {
         val stroke = builder
         builder = null
+        ring.hide()
         if (rubbing || stroke == null) {
             rubbing = false
             return
@@ -250,6 +296,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     private fun penCancel() {
         rubbing = false
+        ring.hide()
         if (builder != null) {
             builder = null
             display.redraw()
@@ -257,6 +304,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     }
 
     private fun rubAt(x: Float, y: Float) {
+        ring.show(x, y)
         val doc = document ?: return
         val reach = RUB * resources.displayMetrics.density / scale
         if (!doc.erase(strokePage, pageX(x), pageY(y), reach, merge = rubbed)) return
@@ -306,7 +354,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     private fun fingers(event: MotionEvent) {
         if (!gesture || measure(event, -1) == 0) return
-        val next = if (span > 0f && startSpan > 0f) (startScale * span / startSpan).coerceIn(fit * MIN_ZOOM, fit * MAX_ZOOM)
+        val next = if (span > 0f && startSpan > 0f) (startScale * span / startSpan).coerceIn(fit * ELASTIC_ZOOM, fit * MAX_ZOOM)
             else startScale
         // The point of the notebook under the fingers stays under them.
         offsetX = cx - (startCx - startX) * next / startScale
@@ -323,16 +371,89 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         display.redraw()
     }
 
-    private fun clamp() {
-        val pages = document?.pages ?: return
-        if (width == 0 || scale == 0f) return
+    /** The fingers let go: a sheet pinched smaller than the screen springs back; otherwise the page coasts. */
+    private fun release() {
+        if (scale < fit) {
+            settle()
+            return
+        }
+        val t = tracker ?: return
+        t.computeCurrentVelocity(1000, ViewConfiguration.get(context).scaledMaximumFlingVelocity.toFloat())
+        val vx = t.xVelocity
+        val vy = t.yVelocity
+        if (hypot(vx, vy) < ViewConfiguration.get(context).scaledMinimumFlingVelocity) return
+        val x = rangeX(scale)
+        val y = rangeY(scale)
+        scroller.fling(offsetX.toInt(), offsetY.toInt(), vx.toInt(), vy.toInt(),
+            x.first.toInt(), x.second.toInt(), y.first.toInt(), y.second.toInt())
+        Choreographer.getInstance().postFrameCallback(coast)
+    }
+
+    /** One step per screen frame while the page coasts; nothing runs once it has stopped. */
+    private val coast = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!scroller.computeScrollOffset()) return
+            offsetX = scroller.currX.toFloat()
+            offsetY = scroller.currY.toFloat()
+            display.redraw()
+            Choreographer.getInstance().postFrameCallback(this)
+        }
+    }
+
+    /** Back to the sheet as wide as the screen, keeping what is in the middle of the screen there. */
+    private fun settle() {
+        val fromScale = scale
+        val fromX = offsetX
+        val fromY = offsetY
+        val toY = (height / 2f - (height / 2f - fromY) * fit / fromScale)
+            .coerceIn(rangeY(fit).first, rangeY(fit).second)
+        val toX = rangeX(fit).second
+        settling = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 180
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                scale = fromScale + (fit - fromScale) * t
+                offsetX = fromX + (toX - fromX) * t
+                offsetY = fromY + (toY - fromY) * t
+                display.redraw()
+            }
+            start()
+        }
+    }
+
+    private fun stopMotion() {
+        scroller.forceFinished(true)
+        Choreographer.getInstance().removeFrameCallback(coast)
+        settling?.let {
+            it.cancel()
+            settling = null
+            // Caught half way back: finish it at once rather than leave the sheet small.
+            if (scale < fit) { scale = fit; clamp(); display.redraw() }
+        }
+    }
+
+    /** Where the notebook's left edge may be at [s] pixels per point: lowest and highest offset. */
+    private fun rangeX(s: Float): Pair<Float, Float> {
         val margin = MARGIN * resources.displayMetrics.density
-        val contentW = (pages.firstOrNull()?.width ?: 0f) * scale
-        val contentH = Render.height(pages) * scale
-        offsetX = if (contentW <= width - 2 * margin) (width - contentW) / 2
-            else offsetX.coerceIn(width - contentW - margin, margin)
-        offsetY = if (contentH <= height - 2 * margin) margin
-            else offsetY.coerceIn(height - contentH - margin, margin)
+        val contentW = (document?.pages?.firstOrNull()?.width ?: 0f) * s
+        if (contentW <= width - 2 * margin) return Pair((width - contentW) / 2, (width - contentW) / 2)
+        return Pair(width - contentW - margin, margin)
+    }
+
+    private fun rangeY(s: Float): Pair<Float, Float> {
+        val margin = MARGIN * resources.displayMetrics.density
+        val contentH = Render.height(document?.pages ?: emptyList()) * s
+        if (contentH <= height - 2 * margin) return Pair(margin, margin)
+        return Pair(height - contentH - margin, margin)
+    }
+
+    private fun clamp() {
+        if (document == null || width == 0 || scale == 0f) return
+        val x = rangeX(scale)
+        val y = rangeY(scale)
+        offsetX = offsetX.coerceIn(x.first, x.second)
+        offsetY = offsetY.coerceIn(y.first, y.second)
     }
 
     // --- drawing ----------------------------------------------------------------------
@@ -382,6 +503,39 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             android.graphics.Bitmap.Config.ARGB_8888)
         scene(Canvas(image), Brush(), height)
         return image
+    }
+
+    /**
+     * The circle the eraser rubs out within. An ordinary view over the page:
+     * a frame behind the pen, which is fine for a guide and keeps it out of
+     * the front buffer, where it would leave a trail.
+     */
+    private inner class Ring : View(context) {
+        var shown = false
+            private set
+        private var cx = 0f
+        private var cy = 0f
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1.5f * resources.displayMetrics.density
+            color = 0xFF8792A8.toInt()  // reads on light and dark paper
+        }
+
+        fun show(x: Float, y: Float) {
+            shown = true
+            cx = x; cy = y
+            invalidate()
+        }
+
+        fun hide() {
+            if (!shown) return
+            shown = false
+            invalidate()
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            if (shown) canvas.drawCircle(cx, cy, RUB * resources.displayMetrics.density, paint)
+        }
     }
 
     /** Everything in onDraw, one frame behind the pen. */
@@ -468,7 +622,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         const val MARGIN = 8f
         /** dp the eraser reaches around the pen tip. */
         const val RUB = 10f
-        const val MIN_ZOOM = 0.35f
+        /** While pinching, the sheet can get this much smaller than the screen; letting go brings it back. */
+        const val ELASTIC_ZOOM = 0.5f
         const val MAX_ZOOM = 5f
     }
 }

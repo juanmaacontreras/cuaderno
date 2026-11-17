@@ -126,6 +126,84 @@ class PageViewTest {
         assertEquals(8f, view.offsetY, 0.5f)
     }
 
+    private fun idle(ms: Long) =
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(ms))
+
+    /** Two fingers, one each side of the middle, from [from] pixels apart to [to]. */
+    private fun pinch(view: PageView, from: Float, to: Float, release: Boolean = true) {
+        fun event(action: Int, count: Int, span: Float) {
+            val properties = Array(count) { i -> MotionEvent.PointerProperties().apply { id = i; toolType = MotionEvent.TOOL_TYPE_FINGER } }
+            val coords = Array(count) { i -> MotionEvent.PointerCoords().apply {
+                x = 600f + (if (i == 0) -span else span) / 2; y = 400f; pressure = 0.5f } }
+            org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(10))
+            val now = SystemClock.uptimeMillis()
+            val e = MotionEvent.obtain(now, now, action, count, properties, coords, 0, 0, 1f, 1f, 0, 0, 0, 0)
+            view.dispatchTouchEvent(e)
+            e.recycle()
+        }
+        event(MotionEvent.ACTION_DOWN, 1, from)
+        event(MotionEvent.ACTION_POINTER_DOWN or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, from)
+        for (i in 1..5) event(MotionEvent.ACTION_MOVE, 2, from + (to - from) * i / 5)
+        if (release) {
+            event(MotionEvent.ACTION_POINTER_UP or (1 shl MotionEvent.ACTION_POINTER_INDEX_SHIFT), 2, to)
+            event(MotionEvent.ACTION_UP, 1, to)
+        }
+    }
+
+    @Test fun pinchedSmallerThanTheScreenTheSheetFollowsTheFingersAndSpringsBack() {
+        val view = page()
+        val fit = view.scale
+        pinch(view, 600f, 360f, release = false)
+        assertEquals(fit * 0.6f, view.scale, fit * 0.02f)       // it follows the fingers below the screen's width
+        pinch(view, 600f, 360f)
+        idle(400)
+        assertEquals(fit, view.scale, 0.0001f)                  // and comes back when they let go
+        assertEquals((1206 - 595f * fit) / 2, view.offsetX, 0.5f)
+        pinch(view, 300f, 600f)
+        idle(400)
+        assertEquals(fit * 2, view.scale, fit * 0.05f)          // zooming in stays where it was left
+    }
+
+    @Test fun thePageCoastsAfterAFlickAndATouchStopsIt() {
+        val view = page()
+        fun flick(y0: Float, y1: Float, stepMs: Long) {
+            touch(view, MotionEvent.ACTION_DOWN, 600f, y0, MotionEvent.TOOL_TYPE_FINGER)
+            for (i in 1..6) {
+                org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(stepMs))
+                touch(view, MotionEvent.ACTION_MOVE, 600f, y0 + (y1 - y0) * i / 6, MotionEvent.TOOL_TYPE_FINGER)
+            }
+            touch(view, MotionEvent.ACTION_UP, 600f, y1, MotionEvent.TOOL_TYPE_FINGER)
+        }
+        flick(700f, 400f, 8)
+        val released = view.offsetY
+        idle(300)
+        val coasting = view.offsetY
+        assertTrue("kept going: $released -> $coasting", coasting < released - 100)
+        touch(view, MotionEvent.ACTION_DOWN, 600f, 400f, MotionEvent.TOOL_TYPE_FINGER)
+        touch(view, MotionEvent.ACTION_UP, 600f, 400f, MotionEvent.TOOL_TYPE_FINGER)
+        idle(300)
+        assertEquals(coasting, view.offsetY, 0.5f)              // a finger down stops it
+        // A slow drag ends where the finger left it.
+        flick(400f, 380f, 200)
+        val slow = view.offsetY
+        idle(300)
+        assertEquals(slow, view.offsetY, 0.5f)
+    }
+
+    @Test fun theEraserShowsWhereItRubsOutAndWritingClosesWhatIsOpen() {
+        val view = page()
+        var closed = 0
+        view.onPenDown = { closed++ }
+        touch(view, MotionEvent.ACTION_DOWN, 300f, 300f, MotionEvent.TOOL_TYPE_STYLUS)
+        assertFalse(view.ringShown)                             // writing: no circle
+        assertEquals(1, closed)
+        touch(view, MotionEvent.ACTION_UP, 300f, 300f, MotionEvent.TOOL_TYPE_STYLUS)
+        touch(view, MotionEvent.ACTION_DOWN, 300f, 500f, MotionEvent.TOOL_TYPE_STYLUS, MotionEvent.BUTTON_STYLUS_PRIMARY)
+        assertTrue(view.ringShown)                              // button held: the circle is there
+        touch(view, MotionEvent.ACTION_UP, 300f, 500f, MotionEvent.TOOL_TYPE_STYLUS, MotionEvent.BUTTON_STYLUS_PRIMARY)
+        assertFalse(view.ringShown)
+    }
+
     @Test fun thePenWritesAndItsButtonAndEraserEndRubOut() {
         val view = page()
         drag(view, MotionEvent.TOOL_TYPE_STYLUS, 208f, 208f, 408f, 208f)
