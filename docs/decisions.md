@@ -5,6 +5,9 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-17
 
+- **Holding the pen "feels odd, it can be improved"** (origen: Juanma, on v14, without
+  details yet). Left as it is for now, at his word ("sigamos"); what is odd is to be asked.
+
 - **Hold the pen still to tidy a stroke** (origen: Juanma asked for it; the details are
   Claude's, to confirm on the tablet). With the pen down, still (within 4 dp) for 0.6 s at
   the end of a stroke, a stroke that clearly is a straight line becomes one between its
@@ -20,6 +23,7 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 - **The emulator lives in `~/.cache/cuaderno-emulator`** (origen: Claude), not in the
   session scratchpad: `/tmp` has a ~3 GB quota per user and the Android 34 image unpacks to
   over 4 GB. Outside the repo and the PATH; delete the folder to remove it.
+  `tools/emulator.sh` installs it, boots it at the tablet's size and opens the debug APK.
 
 ## 2026-11-16
 

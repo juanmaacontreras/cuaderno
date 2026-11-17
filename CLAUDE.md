@@ -24,7 +24,7 @@ https://claude.ai/artifact/PHQmVerxfbkkCipzxGaF2d
 - His way of writing: tools on the left edge, A4 sheets, a fixed-width line (no pressure),
   the pen writes and fingers only move and zoom.
 - The front buffer cannot run in the tests: after touching `PageView`'s display code, try it
-  on an emulator (stylus through `adb shell input stylus swipe`) before releasing.
+  on the emulator (`tools/emulator.sh start`; stylus through `adb shell input stylus`) before releasing.
 - Never lose a note: atomic autosave, our own documented file format with a version number,
   always exportable to PDF. Read `docs/format.md` before touching `core`'s file code.
 - Code, comments and commits in English. UI text in Rioplatense Spanish. Look: Nord.
@@ -43,5 +43,6 @@ https://claude.ai/artifact/PHQmVerxfbkkCipzxGaF2d
 ```bash
 gradle test assembleDebug     # format, kit, own ink (Robolectric); builds the APK
 tools/screens.sh              # real screens to PNG, no device
+tools/emulator.sh start       # tablet-sized emulator with the debug APK (shot, adb, stop)
 claude-budget                 # startup context, goal < 3000 tokens
 ```
