@@ -1,6 +1,6 @@
 # Status
 
-Updated: 2026-11-16. Read with `CLAUDE.md` at the start of a session; update at the end.
+Updated: 2026-11-17. Read with `CLAUDE.md` at the start of a session; update at the end.
 
 ## Where it is
 
@@ -18,7 +18,11 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 
 ## Verified, and not
 
-- Tests: core 15, kit 2, app 11 (page in points at any zoom, fixed width, fingers never
+- Holding the pen still at the end of a stroke straightens a line or rounds a circle (v14):
+  tested (core 16, app 21, kit 2 in all) and tried on the emulator with adb's stylus (line, line aimed
+  after the hold, circle shown clean while the pen is down, undo). Not tried with the real
+  S-Pen: whether 0.6 s and 4 dp feel right is his call.
+- Earlier tests (page in points at any zoom, fixed width, fingers never
   write, pen button and eraser end, next page, saved and reloaded, unreadable file set
   aside, recordings replay, cost per pen sample). `tools/screens.sh` draws the screen.
 - On an Android 34 emulator at the tablet's size, with adb's simulated stylus and finger:
@@ -34,9 +38,9 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write
    them in `plan.md` when he lists them, do not build them yet.
-2. Rest of phase 1: straight line / circle when the pen is held at the end of a stroke
-   (he asked for it), highlighter, partial eraser, a rendering cache (tiles) before notebooks
+2. He tries holding the pen on the tablet (v14): too slow, too eager, shapes he misses.
+3. Rest of phase 1: highlighter, partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.
-3. Still open: the name, what else he really uses in
+4. Still open: the name, what else he really uses in
    Samsung Notes (`plan.md` section 3 has what he said so far), and a real pen recording
    (menu, "Grabar trazos") for the tests.
