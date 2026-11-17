@@ -38,7 +38,8 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write
    them in `plan.md` when he lists them, do not build them yet.
-2. He tries holding the pen on the tablet (v14): too slow, too eager, shapes he misses.
+2. Holding the pen (v14) "feels odd, it can be improved" (Juanma): ask what exactly (too
+   slow, too eager, the line following the pen, how the shape appears) before touching it.
 3. Rest of phase 1: highlighter, partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.
 4. Still open: the name, what else he really uses in
