@@ -242,6 +242,15 @@ semana con el plan Pro.
 | **6. Ecosistema** | Copia de los cuadernos al Drive del cerebro, mandar una página a la PC, y lo que Juanma pida para los otros dispositivos | A definir con él cuando llegue |
 | **7. Extras** | Audio sincronizado, cinta para autoevaluación, símbolos guardados, puntero | Una por una, si las pide |
 
+### Ideas anotadas, sin diseñar ni ubicar en una fase
+
+Quedan escritas para no perderlas. No están pensadas: antes de construir cualquiera hay
+que definirla con Juanma.
+
+- **Dibujar más rápido gráficos, circuitos y diagramas de bloques** (origen: Juanma,
+  2026-11-16). Solo la idea; él pidió no pensarla todavía. Relacionada con las formas que
+  se enderezan (fase 3) y los símbolos guardados (fase 7).
+
 ## 7. Cuándo frenar
 
 Escrito ahora para decidir en frío (origen: Claude):
