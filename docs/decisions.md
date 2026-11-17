@@ -5,6 +5,10 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-16
 
+- **Fluency settled on the tablet with v11** (origen: Juanma: "va re fluido", the readout
+  shows 90 frames per second at 90 Hz, now and then slightly less). The redraw through the
+  library is enough for now; tiles wait until notebooks get long.
+
 - **"Not as fluid as Samsung Notes" when the page moves** (origen: Juanma, on v10). Not
   measured on the tablet, so the cause is a guess (origen: Claude) and three cheap things
   went in: the window asks for the screen's fastest mode (a surface fed irregularly can be

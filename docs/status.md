@@ -30,8 +30,10 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 
 ## Next
 
-1. Fluency: he found v10 less fluid than Samsung Notes. v11 has a first attempt and a
-   readout (menu, "Medir fluidez"). Get his numbers while scrolling before changing more.
+1. Fluency is fine on the tablet with v11 (90 frames per second, his reading). Battery is
+   not measured: he compares a class day against Samsung Notes in Android's battery screen.
+   He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write
+   them in `plan.md` when he lists them, do not build them yet.
 2. Rest of phase 1: straight line / circle when the pen is held at the end of a stroke
    (he asked for it), highlighter, partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.
