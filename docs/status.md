@@ -18,7 +18,7 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 
 ## Verified, and not
 
-- Highlighter (v15): tested (seen through while writing and once lifted, the same within
+- Highlighter (v16): tested (seen through while writing and once lifted, the same within
   rounding; under the ink after) and tried on the emulator (front buffer see-through and
   even while the pen is down, ink sharp on top after). Renders: `tools/screens.sh`, 4 and 5.
   Not tried with the real S-Pen.
