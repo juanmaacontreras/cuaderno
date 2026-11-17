@@ -7,6 +7,7 @@ import com.juanma.kit.Ui
 import cuaderno.core.Page
 import cuaderno.core.Paper
 import cuaderno.core.Stroke
+import cuaderno.core.Tool
 
 /**
  * Draws pages and strokes, in page points: the caller sets the canvas up so
@@ -20,6 +21,11 @@ class Render {
     var dark = false
 
     private val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val highlight = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
@@ -53,11 +59,15 @@ class Render {
         rule.color = if (dark) RULE_DARK else RULE_LIGHT
         canvas.drawRect(0f, 0f, page.width, page.height, fill)
         paper(canvas, page)
-        for (stroke in page.strokes) {
-            // Zoomed in, most of a page's strokes are off screen: skip them.
-            val b = stroke.bounds
-            if (b[3] + stroke.width < top || b[1] - stroke.width > bottom) continue
-            stroke(canvas, stroke)
+        // Highlighter first, so it sits under the ink like on paper and the letters stay sharp.
+        for (pass in Tool.entries.sortedBy { if (it == Tool.HIGHLIGHTER) 0 else 1 }) {
+            for (stroke in page.strokes) {
+                if (stroke.tool != pass) continue
+                // Zoomed in, most of a page's strokes are off screen: skip them.
+                val b = stroke.bounds
+                if (b[3] + stroke.width < top || b[1] - stroke.width > bottom) continue
+                stroke(canvas, stroke)
+            }
         }
         canvas.restore()
     }
@@ -92,13 +102,15 @@ class Render {
      * in the stroke but not drawn: Juanma writes with a fixed-width line.
      */
     fun stroke(canvas: Canvas, stroke: Stroke) {
-        ink.color = shown(stroke.color, dark)
-        ink.strokeWidth = stroke.width
+        // The highlighter is see-through as a whole stroke: one path, so where it crosses itself it does not darken.
+        val paint = if (stroke.tool == Tool.HIGHLIGHTER) highlight else ink
+        paint.color = if (stroke.tool == Tool.HIGHLIGHTER) faded(stroke.color, dark) else shown(stroke.color, dark)
+        paint.strokeWidth = stroke.width
         if (stroke.size == 1) {
-            canvas.drawPoint(stroke.x(0), stroke.y(0), ink)
+            canvas.drawPoint(stroke.x(0), stroke.y(0), paint)
             return
         }
-        canvas.drawPath(paths[stroke] ?: build(stroke), ink)
+        canvas.drawPath(paths[stroke] ?: build(stroke), paint)
     }
 
     private fun build(stroke: Stroke): Path {
@@ -143,6 +155,18 @@ class Render {
             !dark && color == INK_ON_DARK -> INK_ON_LIGHT
             else -> color
         }
+        /**
+         * Highlighter colours, written opaque in the file and shown see-through:
+         * Nord's yellow, green, frost, purple and orange.
+         */
+        val HIGHLIGHTS = listOf(Ui.YELLOW, Ui.GREEN, Ui.ACCENT, 0xFFB48EAD.toInt(), Ui.ORANGE)
+
+        /** How much of the highlighter shows: on dark paper less, or it washes the ink out. */
+        fun highlightAlpha(dark: Boolean) = if (dark) 0.4f else 0.65f
+
+        fun faded(color: Int, dark: Boolean): Int =
+            (color and 0xFFFFFF) or ((highlightAlpha(dark) * 255).toInt() shl 24)
+
         /** What shows around and between the sheets. */
         const val DESK = 0xFF242933.toInt()
 

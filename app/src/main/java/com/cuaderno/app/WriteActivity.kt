@@ -18,6 +18,7 @@ import com.cuaderno.app.page.Render
 import com.juanma.kit.Ui
 import com.juanma.kit.Updater
 import cuaderno.core.Document
+import cuaderno.core.Tool
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -27,11 +28,17 @@ import kotlin.concurrent.thread
  * is one notebook; the library comes in phase 2.
  */
 class WriteActivity : Activity() {
-    /** The first is the paper's plain ink; the rest read on both papers. */
-    private val colors get() = listOf(Render.ink(page.darkPaper), Ui.ACCENT_DEEP, Ui.RED, Ui.GREEN_DEEP, Ui.ORANGE)
+    /** The pen's first colour is the paper's plain ink; the rest read on both papers. */
+    private val colors get() = if (page.tool == Tool.HIGHLIGHTER) Render.HIGHLIGHTS
+        else listOf(Render.ink(page.darkPaper), Ui.ACCENT_DEEP, Ui.RED, Ui.GREEN_DEEP, Ui.ORANGE)
     private val prefs by lazy { getSharedPreferences("cuaderno", MODE_PRIVATE) }
-    /** Line widths in page points: about 0.25, 0.4 and 0.65 mm on paper. */
-    private val widths = listOf(0.7f, 1.1f, 1.8f)
+    /**
+     * Widths in page points. Pen: about 0.25, 0.4 and 0.65 mm on paper. Highlighter:
+     * about 2, 3.5 and 5 mm (a grid square is 5 mm).
+     */
+    private val widths get() = if (page.tool == Tool.HIGHLIGHTER) listOf(6f, 10f, 14f) else listOf(0.7f, 1.1f, 1.8f)
+    /** What each tool was last set to (colour, width), so switching tools brings it back. */
+    private val chosen = mutableMapOf(Tool.HIGHLIGHTER to Pair(Ui.YELLOW, 10f))
     private val updater = Updater("juanmaacontreras/cuaderno")
 
     private lateinit var store: Store
@@ -152,15 +159,19 @@ class WriteActivity : Activity() {
 
     private fun renderBar() {
         bar.removeAllViews()
-        bar.addView(Ui.tool(this, "pen", on = !page.erasing) {
-            if (page.erasing) {
-                page.erasing = false
-            } else {
-                // Tapping the pen in use opens its widths, as in Samsung Notes.
-                widthPanel.visibility = if (widthPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            }
-            renderBar()
-        })
+        for ((tool, icon) in listOf(Tool.PEN to "pen", Tool.HIGHLIGHTER to "highlighter")) {
+            val inUse = !page.erasing && page.tool == tool
+            bar.addView(Ui.tool(this, icon, on = inUse) {
+                if (inUse) {
+                    // Tapping the tool in use opens its widths, as in Samsung Notes.
+                    widthPanel.visibility = if (widthPanel.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                } else {
+                    use(tool)
+                    widthPanel.visibility = View.GONE
+                }
+                renderBar()
+            })
+        }
         bar.addView(Ui.tool(this, "eraser", on = page.erasing) {
             page.erasing = true
             widthPanel.visibility = View.GONE
@@ -183,13 +194,26 @@ class WriteActivity : Activity() {
         bar.addView(more)
 
         widthPanel.removeAllViews()
+        val marker = page.tool == Tool.HIGHLIGHTER
         for (option in widths) {
-            widthPanel.addView(Ui.swatch(this, Ui.TEXT, 3f + option * 6f, page.widthPt == option) {
+            val size = if (marker) 6f + option * 1.2f else 3f + option * 6f
+            widthPanel.addView(Ui.swatch(this, if (marker) page.color else Ui.TEXT, size, page.widthPt == option) {
                 page.widthPt = option
                 widthPanel.visibility = View.GONE
                 renderBar()
             })
         }
+    }
+
+    /** Switches the stylus to [tool] with the colour and width it had last time. */
+    private fun use(tool: Tool) {
+        page.erasing = false
+        if (page.tool == tool) return
+        chosen[page.tool] = Pair(page.color, page.widthPt)
+        page.tool = tool
+        val (color, width) = chosen[tool] ?: Pair(Render.ink(page.darkPaper), 1.1f)
+        page.color = color
+        page.widthPt = width
     }
 
     /** Undo and redo change the notebook from outside the page. */

@@ -113,6 +113,35 @@ class PageViewTest {
         assertEquals(Ui.RED, view.snapshot().getPixel(300, 308))
     }
 
+    @Test fun theHighlighterIsSeeThroughEvenWhileWritingAndSitsUnderTheInk() {
+        val view = page()
+        line(view, 208f, 208f, 408f, 208f)                           // ink first
+        view.tool = cuaderno.core.Tool.HIGHLIGHTER
+        view.color = Ui.YELLOW
+        view.widthPt = 10f
+        view.penDown(308f, 150f)
+        for (i in 1..10) view.penMove(308f, 150f + 11f * i)          // across the ink, pen still down
+        fun screen() = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+            .also { view.draw(android.graphics.Canvas(it)) }
+        val live = screen()
+        val blend = live.getPixel(308, 180)
+        assertTrue(blend != Render.PAPER_LIGHT && blend != Ui.YELLOW)  // see-through, not solid
+        view.penUp()
+        val stroke = view.document!!.pages[0].strokes[1]
+        assertEquals(cuaderno.core.Tool.HIGHLIGHTER, stroke.tool)
+        assertEquals(Ui.YELLOW, stroke.color)                         // the file keeps it opaque
+        assertEquals(10f, stroke.width)
+        val after = screen()
+        // The same while writing as once lifted, all along: the pieces of the stroke in
+        // progress do not darken where they meet. (Not where the ink crosses: it goes on top after.)
+        // Within rounding (a channel off by one between the two ways of blending); a darker
+        // overlap would be tens off.
+        fun near(a: Int, b: Int) = (0..2).all { kotlin.math.abs((a shr (it * 8) and 255) - (b shr (it * 8) and 255)) <= 3 }
+        for (y in 160..250) if (y !in 200..216) assertTrue("y $y", near(after.getPixel(305, y), live.getPixel(305, y)))
+        assertTrue(near(blend, after.getPixel(308, 180)))
+        assertEquals(Ui.BG, after.getPixel(308, 208))                 // the ink crossing it stays sharp, on top
+    }
+
     @Test fun aFingerMovesThePageAndNeverWrites() {
         val view = page()
         line(view, 208f, 208f, 408f, 208f)
