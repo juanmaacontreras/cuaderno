@@ -48,7 +48,8 @@ import kotlin.math.roundToInt
 class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** A piece of the stroke in progress, in pixels, complete in itself so another thread can draw it. */
     private class Piece(val color: Int, val width: Float, val x0: Float, val y0: Float,
-                        val cx: Float, val cy: Float, val x1: Float, val y1: Float, val line: Boolean)
+                        val cx: Float, val cy: Float, val x1: Float, val y1: Float, val line: Boolean,
+                        val alpha: Float = 1f)
 
     private interface Display {
         val view: View
@@ -72,6 +73,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
     /** Line width in page points. */
     var widthPt = 1.1f
+    /** Pen or highlighter: what the stylus writes with. */
+    var tool = Tool.PEN
     var erasing = false
 
     /** Called on the main thread after the notebook changes. */
@@ -277,7 +280,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             return
         }
         strokeStart = timeMs
-        builder = StrokeBuilder(Tool.PEN, color, widthPt).also {
+        builder = StrokeBuilder(tool, color, widthPt).also {
             it.add(pageX(x), pageY(y), pressure, 0f, tilt, orientation)
         }
         count = 1
@@ -286,8 +289,13 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         holdX = x; holdY = y
         timer.removeCallbacks(hold)
         timer.postDelayed(hold, HOLD_MS)
-        display.add(Piece(Render.shown(color, darkPaper), widthPt * scale, x, y, x, y, x, y, line = true))
+        display.add(Piece(liveColor(), widthPt * scale, x, y, x, y, x, y, line = true, alpha = liveAlpha()))
     }
+
+    // The stroke in progress is drawn opaque, piece by piece; a highlighter's whole layer is
+    // then shown see-through. See-through pieces would darken where each one overlaps the last.
+    private fun liveColor() = if (tool == Tool.HIGHLIGHTER) color else Render.shown(color, darkPaper)
+    private fun liveAlpha() = if (tool == Tool.HIGHLIGHTER) Render.highlightAlpha(darkPaper) else 1f
 
     fun penMove(x: Float, y: Float, timeMs: Long = 0, pressure: Float = 0.5f, tilt: Float = 0f, orientation: Float = 0f) {
         if (rubbing) {
@@ -315,7 +323,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         // The curve between the midpoints around the previous sample: the same shape Render draws later.
         val fromX = if (count == 1) lastX else (beforeX + lastX) / 2
         val fromY = if (count == 1) lastY else (beforeY + lastY) / 2
-        display.add(Piece(Render.shown(color, darkPaper), widthPt * scale, fromX, fromY, lastX, lastY, (lastX + x) / 2, (lastY + y) / 2, line = false))
+        display.add(Piece(liveColor(), widthPt * scale, fromX, fromY, lastX, lastY, (lastX + x) / 2, (lastY + y) / 2, line = false, alpha = liveAlpha()))
         beforeX = lastX; beforeY = lastY
         lastX = x; lastY = y
         count++
@@ -614,7 +622,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
         override fun onDraw(canvas: Canvas) {
             scene(canvas, brush, height)
+            val alpha = live.firstOrNull()?.alpha ?: 1f
+            if (alpha < 1f) canvas.saveLayerAlpha(null, (alpha * 255).toInt())
             for (piece in live) brush.piece(canvas, piece)
+            if (alpha < 1f) canvas.restore()
         }
     }
 
@@ -686,8 +697,20 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             if (again.getAndSet(false)) surface.post { redraw() }
         }
 
-        override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Piece) =
+        @Volatile private var alpha = 1f
+
+        override fun onDrawFrontBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, param: Piece) {
+            alpha = param.alpha
             brush.piece(canvas, param)
+        }
+
+        /** The front layer as a whole is see-through for the highlighter, solid for the pen. */
+        override fun onFrontBufferedLayerRenderComplete(
+            frontBufferedLayerSurfaceControl: SurfaceControlCompat,
+            transaction: SurfaceControlCompat.Transaction,
+        ) {
+            transaction.setAlpha(frontBufferedLayerSurfaceControl, alpha)
+        }
 
         /** [params] are the pieces drawn since the last time; the notebook already holds that stroke. */
         override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Piece>) =

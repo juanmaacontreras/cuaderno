@@ -5,6 +5,18 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-17
 
+- **Highlighter** (origen: plan phase 1; the look is Claude's, shown to Juanma as renders).
+  A tool between the pen and the eraser, with its own five colours (Nord yellow, green,
+  frost, purple, orange) and three widths (about 2, 3.5 and 5 mm; 3.5 to start, a grid
+  square is 5 mm). Each tool remembers its own colour and width. Round tip, fixed width
+  like the pen. It is see-through (65 % on light paper, 40 % on dark, where more washes
+  the ink out) and drawn **under** the ink, so letters stay sharp, as on paper. The file
+  keeps the colour opaque with tool 1 (format unchanged: it already had the tool).
+  While writing, the stroke goes to the front buffer opaque and the whole front layer is
+  shown see-through (`SurfaceControl` alpha): see-through pieces would darken where each
+  overlaps the last. Live it shows over the ink; on lifting, under it. Holding the pen
+  still straightens a highlight too. Not in: a chisel tip, ink-aware snapping to a row.
+
 - **Holding the pen "feels odd, it can be improved"** (origen: Juanma, on v14, without
   details yet). Left as it is for now, at his word ("sigamos"); what is odd is to be asked.
 

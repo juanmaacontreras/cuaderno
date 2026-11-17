@@ -18,6 +18,10 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
 
 ## Verified, and not
 
+- Highlighter (v15): tested (seen through while writing and once lifted, the same within
+  rounding; under the ink after) and tried on the emulator (front buffer see-through and
+  even while the pen is down, ink sharp on top after). Renders: `tools/screens.sh`, 4 and 5.
+  Not tried with the real S-Pen.
 - Holding the pen still at the end of a stroke straightens a line or rounds a circle (v14):
   tested (core 16, app 21, kit 2 in all) and tried on the emulator with adb's stylus (line, line aimed
   after the hold, circle shown clean while the pen is down, undo). Not tried with the real
@@ -40,7 +44,7 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
    them in `plan.md` when he lists them, do not build them yet.
 2. Holding the pen (v14) "feels odd, it can be improved" (Juanma): ask what exactly (too
    slow, too eager, the line following the pen, how the shape appears) before touching it.
-3. Rest of phase 1: highlighter, partial eraser, a rendering cache (tiles) before notebooks
+3. Rest of phase 1: partial eraser, a rendering cache (tiles) before notebooks
    get long, light PDF export if he prints.
 4. Still open: the name, what else he really uses in
    Samsung Notes (`plan.md` section 3 has what he said so far), and a real pen recording
