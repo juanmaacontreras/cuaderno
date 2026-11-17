@@ -22,6 +22,7 @@ import cuaderno.core.Document
 import cuaderno.core.StrokeBuilder
 import cuaderno.core.Tool
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /**
  * The page being written on. The pen writes (or rubs out: its button, its
@@ -71,6 +72,13 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     /** Called on the main thread after the notebook changes. */
     var onChange: (() -> Unit)? = null
+
+    /**
+     * When set, told about once a second while the page is being redrawn: frames shown
+     * in that second, the slowest one in milliseconds, and the screen's refresh rate.
+     * Only the front-buffer display measures. On the main thread.
+     */
+    var onFluency: ((frames: Int, worstMs: Int, screenHz: Int) -> Unit)? = null
 
     /** Called when the pen touches the page, to put away whatever was open over it. */
     var onPenDown: (() -> Unit)? = null
@@ -600,11 +608,30 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             }
         }
 
+        // Fluency, for the readout: counted on the render thread, reported on the main one.
+        private var windowStart = 0L
+        private var frames = 0
+        private var worst = 0L
+
+        private fun measured(now: Long) {
+            val took = now - busySince
+            if (now - windowStart > 1500) { windowStart = now; frames = 0; worst = 0 }  // a pause: start over
+            frames++
+            if (took > worst) worst = took
+            if (now - windowStart >= 1000) {
+                val f = frames
+                val w = worst.toInt()
+                windowStart = now; frames = 0; worst = 0
+                surface.post { onFluency?.invoke(f, w, (surface.display?.refreshRate ?: 0f).roundToInt()) }
+            }
+        }
+
         override fun onMultiBufferedLayerRenderComplete(
             frontBufferedLayerSurfaceControl: SurfaceControlCompat,
             multiBufferedLayerSurfaceControl: SurfaceControlCompat,
             transaction: SurfaceControlCompat.Transaction,
         ) {
+            if (onFluency != null) measured(SystemClock.uptimeMillis())
             busy.set(false)
             if (again.getAndSet(false)) surface.post { redraw() }
         }

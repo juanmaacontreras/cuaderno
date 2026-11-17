@@ -10,6 +10,10 @@ object Strings {
     const val PAPER_DARK = "Papel oscuro"
     const val PAPER_LIGHT = "Papel claro"
 
+    const val FLUENCY = "Medir fluidez"
+    const val FLUENCY_STOP = "Dejar de medir fluidez"
+    fun fluency(frames: Int, worstMs: Int, hz: Int) = "$frames cuadros/s · peor $worstMs ms · pantalla $hz Hz"
+
     const val RECORD = "Grabar trazos"
     const val RECORD_STOP = "Parar la grabación y mandarla"
     const val RECORD_EMPTY = "No se grabó ningún trazo"
