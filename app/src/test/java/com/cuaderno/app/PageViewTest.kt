@@ -204,6 +204,45 @@ class PageViewTest {
         assertFalse(view.ringShown)
     }
 
+    @Test fun holdingThePenAtTheEndStraightensALineAndRoundsACircle() {
+        val view = page()
+        fun shaky(y: Float, wait: Long) {
+            view.penDown(200f, y)
+            for (i in 1..30) view.penMove(200f + i * 10f, y + 6f * kotlin.math.sin(i * 0.8f))
+            idle(wait)
+            view.penUp()
+        }
+        shaky(200f, 100)                                        // lifted at once: kept as written
+        shaky(300f, 700)                                        // held: a straight line
+        val strokes = view.document!!.pages[0].strokes
+        assertEquals(31, strokes[0].size)
+        assertEquals(2, strokes[1].size)
+        // Held and then moved: the line's end follows the pen.
+        view.penDown(200f, 400f)
+        for (i in 1..30) view.penMove(200f + i * 10f, 400f)
+        idle(700)
+        view.penMove(500f, 460f)
+        view.penUp()
+        val moved = view.document!!.pages[0].strokes[2]
+        assertEquals(2, moved.size)
+        assertEquals((460f - view.offsetY) / view.scale, moved.y(1), 0.01f)
+        // A rough circle, held.
+        view.penDown(700f, 300f)
+        for (i in 1..60) {
+            val a = 2 * Math.PI * i / 60
+            view.penMove(600f + 100f * kotlin.math.cos(a).toFloat() * (1 + 0.05f * kotlin.math.sin(4 * a).toFloat()),
+                300f + 100f * kotlin.math.sin(a).toFloat())
+        }
+        idle(700)
+        val image = view.snapshot()                              // shown clean while the pen is still down
+        view.penUp()
+        val circle = view.document!!.pages[0].strokes[3]
+        assertEquals(73, circle.size)
+        assertEquals(Ui.BG, image.getPixel(600, 200))            // the top of the round circle
+        view.document!!.undo()
+        assertEquals(3, view.document!!.pages[0].strokes.size)   // one undo takes the shape away
+    }
+
     @Test fun thePenWritesAndItsButtonAndEraserEndRubOut() {
         val view = page()
         drag(view, MotionEvent.TOOL_TYPE_STYLUS, 208f, 208f, 408f, 208f)

@@ -13,12 +13,16 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.OverScroller
 import android.view.View
 import android.widget.FrameLayout
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.SurfaceView
 import androidx.graphics.surface.SurfaceControlCompat
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
 import cuaderno.core.Document
+import cuaderno.core.Shapes
+import cuaderno.core.Stroke
 import cuaderno.core.StrokeBuilder
 import cuaderno.core.Tool
 import kotlin.math.hypot
@@ -94,6 +98,14 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     // The pen
     private var penId = -1
     private var builder: StrokeBuilder? = null
+
+    /** A stroke tidied into a shape while the pen is still down: drawn with the notebook, added on lifting. */
+    private class Held(val stroke: Stroke, val top: Float)
+    @Volatile private var held: Held? = null
+    private var holdX = 0f
+    private var holdY = 0f
+    private val timer = Handler(Looper.getMainLooper())
+    private val hold = Runnable { tidy() }
     private var strokePage = 0
     private var strokeTop = 0f
     private var strokeStart = 0L
@@ -230,6 +242,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
+        timer.removeCallbacks(hold)
         stopMotion()
     }
 
@@ -269,6 +282,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
         count = 1
         lastX = x; lastY = y
+        held = null
+        holdX = x; holdY = y
+        timer.removeCallbacks(hold)
+        timer.postDelayed(hold, HOLD_MS)
         display.add(Piece(Render.shown(color, darkPaper), widthPt * scale, x, y, x, y, x, y, line = true))
     }
 
@@ -279,6 +296,21 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
         val stroke = builder ?: return
         if (x == lastX && y == lastY) return
+        held?.let {
+            // A line already straightened follows the pen by its end; a circle stays.
+            if (it.stroke.size == 2) {
+                held = Held(Shapes.segment(it.stroke, it.stroke.x(0), it.stroke.y(0), pageX(x), pageY(y)), it.top)
+                lastX = x; lastY = y
+                display.redraw()
+            }
+            return
+        }
+        // Still means within a few pixels of where it stopped: a held pen trembles.
+        if (hypot(x - holdX, y - holdY) > HOLD_SLOP * resources.displayMetrics.density) {
+            holdX = x; holdY = y
+            timer.removeCallbacks(hold)
+            timer.postDelayed(hold, HOLD_MS)
+        }
         stroke.add(pageX(x), pageY(y), pressure, (timeMs - strokeStart).toFloat(), tilt, orientation)
         // The curve between the midpoints around the previous sample: the same shape Render draws later.
         val fromX = if (count == 1) lastX else (beforeX + lastX) / 2
@@ -293,11 +325,14 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val stroke = builder
         builder = null
         ring.hide()
+        timer.removeCallbacks(hold)
+        val shape = held?.stroke
+        held = null
         if (rubbing || stroke == null) {
             rubbing = false
             return
         }
-        document?.add(strokePage, stroke.build())
+        document?.add(strokePage, shape ?: stroke.build())
         display.redraw()
         onChange?.invoke()
     }
@@ -305,10 +340,21 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     private fun penCancel() {
         rubbing = false
         ring.hide()
+        timer.removeCallbacks(hold)
+        held = null
         if (builder != null) {
             builder = null
             display.redraw()
         }
+    }
+
+    /** The pen has been still, down, for [HOLD_MS]: if the stroke is a line or a circle, show it clean. */
+    private fun tidy() {
+        val stroke = builder ?: return
+        if (rubbing || held != null) return
+        val shape = Shapes.tidy(stroke.build()) ?: return
+        held = Held(shape, strokeTop)
+        display.redraw()   // hides the hand-drawn stroke in the front layer and draws the shape
     }
 
     private fun rubAt(x: Float, y: Float) {
@@ -502,6 +548,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         canvas.scale(s, s)
         brush.render.dark = darkPaper
         brush.render.pages(canvas, pages, -y / s, (height - y) / s)
+        held?.let {
+            canvas.translate(0f, it.top)
+            brush.render.stroke(canvas, it.stroke)
+        }
         canvas.restore()
     }
 
@@ -649,6 +699,9 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         const val MARGIN = 8f
         /** dp the eraser reaches around the pen tip. */
         const val RUB = 10f
+        /** Holding the pen this long, this still (dp), at the end of a stroke tidies it. */
+        const val HOLD_MS = 600L
+        const val HOLD_SLOP = 4f
         /** While pinching, the sheet can get this much smaller than the screen; letting go brings it back. */
         const val ELASTIC_ZOOM = 0.5f
         const val MAX_ZOOM = 5f

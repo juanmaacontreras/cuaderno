@@ -3,6 +3,24 @@
 Newest first. "origen" says who decided: Juanma, or Claude (a suggestion until he confirms).
 The plan (`plan.md`) is corrected here when reality contradicts it.
 
+## 2026-11-17
+
+- **Hold the pen still to tidy a stroke** (origen: Juanma asked for it; the details are
+  Claude's, to confirm on the tablet). With the pen down, still (within 4 dp) for 0.6 s at
+  the end of a stroke, a stroke that clearly is a straight line becomes one between its
+  ends, and one that goes once round and closes becomes a round circle. It shows clean at
+  once, pen still down; lifting keeps it. A line already straightened follows the pen by
+  its end until lifting (to aim it); a circle stays put. Anything that is neither (an arc,
+  a C, a long oval, a zigzag, twice round, a tick under 10 pt) is left as written: a wrong
+  guess is worse than none. One undo removes the shape. `cuaderno.core.Shapes` does the
+  recognising; the circle is the least-squares fit to all the samples (Kåsa), not the middle
+  of the bounds, which a wobble on one side shifts. The file keeps only the clean stroke.
+  Ellipses, rectangles, arrows and snapping angles are not in: they wait for how he uses
+  this (and the idea of drawing circuits and block diagrams faster, plan section 3).
+- **The emulator lives in `~/.cache/cuaderno-emulator`** (origen: Claude), not in the
+  session scratchpad: `/tmp` has a ~3 GB quota per user and the Android 34 image unpacks to
+  over 4 GB. Outside the repo and the PATH; delete the folder to remove it.
+
 ## 2026-11-16
 
 - **Fluency settled on the tablet with v11** (origen: Juanma: "va re fluido", the readout
