@@ -4,9 +4,6 @@ import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Path
-import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
@@ -19,7 +16,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import com.cuaderno.app.page.Render
+import com.cuaderno.app.page.Thumbnail
 import com.juanma.kit.Icons
 import com.juanma.kit.Ui
 import cuaderno.core.Library
@@ -176,32 +173,10 @@ class LibraryActivity : Activity() {
         return card
     }
 
-    /**
-     * A sheet as a picture with round corners and a thin edge (dark paper on the dark library
-     * would not show where the sheet ends), [widthDp] wide; [part] of its width shows (its
-     * corner, enlarged). [dark] paper as he set it, unless asked otherwise.
-     */
+    /** A sheet [widthDp] wide, on the paper he set unless asked otherwise (see [Thumbnail]). */
     private fun thumbnail(page: Page, widthDp: Float, part: Float = 1f,
-                          dark: Boolean = prefs.getBoolean("dark_paper", false)): Bitmap {
-        val w = dp(widthDp)
-        val h = (w * page.height / page.width).toInt()
-        val image = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(image)
-        val corner = dp(6f).toFloat()
-        canvas.clipPath(Path().apply { addRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), corner, corner, Path.Direction.CW) })
-        val s = w / (page.width * part)
-        canvas.save()
-        canvas.scale(s, s)
-        Render().also { it.dark = dark }.page(canvas, page)
-        canvas.restore()
-        val edge = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = dp(2f).toFloat()
-            color = Ui.MUTED
-        }
-        canvas.drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), corner, corner, edge)
-        return image
-    }
+                          dark: Boolean = prefs.getBoolean("dark_paper", false)): Bitmap =
+        Thumbnail.draw(page, dp(widthDp), dark, resources.displayMetrics.density, part)
 
     /** "hoy", "ayer", or the day and month. */
     private fun day(iso: String): String = try {

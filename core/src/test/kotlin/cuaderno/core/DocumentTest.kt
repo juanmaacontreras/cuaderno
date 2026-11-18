@@ -68,4 +68,49 @@ class DocumentTest {
         assertEquals(2, saved.pages.size)
         assertEquals(2, Document(saved).pages.size)
     }
+
+    /** Three written pages, a, b and c by the height of their one line, and the blank one at the end. */
+    private fun three(): Document {
+        val doc = empty()
+        doc.add(0, line(100f)); doc.add(1, line(200f)); doc.add(2, line(300f))
+        return doc
+    }
+
+    private fun Document.lines() = pages.map { p -> p.strokes.firstOrNull()?.y(0)?.toInt() ?: 0 }
+
+    @Test fun pagesAreAddedDuplicatedMovedAndRepaperedAndEachIsOneUndo() {
+        val doc = three()
+        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+
+        doc.insertAfter(0)
+        assertEquals(listOf(100, 0, 200, 300, 0), doc.lines())
+        assertEquals("ids stay unique", doc.pages.size, doc.pages.map { it.id }.toSet().size)
+        doc.undo()
+        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+
+        doc.duplicate(1)
+        assertEquals(listOf(100, 200, 200, 300, 0), doc.lines())
+        assertTrue(doc.pages[1].strokes == doc.pages[2].strokes)
+        assertEquals(doc.pages.size, doc.pages.map { it.id }.toSet().size)
+        doc.undo()
+
+        doc.move(2, 0)
+        assertEquals(listOf(300, 100, 200, 0), doc.lines())
+        doc.move(0, 2)
+        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        doc.undo(); doc.undo()
+        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+
+        doc.paper(1, Paper.RULED)
+        assertEquals(Paper.RULED, doc.pages[1].paper)
+        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        doc.undo()
+        assertEquals(Paper.GRID, doc.pages[1].paper)
+    }
+
+    @Test fun movingTheBlankPageAwayFromTheEndBringsANewOne() {
+        val doc = three()
+        doc.move(3, 0)
+        assertEquals(listOf(0, 100, 200, 300, 0), doc.lines())
+    }
 }

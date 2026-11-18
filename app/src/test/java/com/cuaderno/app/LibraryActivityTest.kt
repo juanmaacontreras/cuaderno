@@ -76,8 +76,7 @@ class LibraryActivityTest {
     @Test fun theBarsTopButtonGoesToTheLibrary() {
         written(File(root, "cuaderno.cuaderno"), "Cuaderno")
         val screen = write()
-        val bar = (screen.findViewById<ViewGroup>(android.R.id.content).getChildAt(0) as ViewGroup).getChildAt(0) as ViewGroup
-        bar.getChildAt(0).performClick()
+        screen.bar.getChildAt(0).performClick()
         assertEquals(LibraryActivity::class.java.name, shadowOf(screen).nextStartedActivity.component!!.className)
         assertTrue(screen.isFinishing)
     }

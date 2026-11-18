@@ -52,6 +52,12 @@ object Strings {
     fun notebooks(n: Int) = if (n == 1) "1 cuaderno" else "$n cuadernos"
     fun pages(n: Int) = if (n == 1) "1 página" else "$n páginas"
 
+    const val PAGES = "Páginas"
+    fun pagesTitle(n: Int) = "Páginas · $n"
+    const val NEW_PAGE_AFTER = "Página nueva después"
+    const val DUPLICATE = "Duplicar"
+    fun paperIs(name: String) = "Papel: $name"
+
     const val UPDATE = "Actualizar"
     const val UPDATE_DOWNLOADING = "Bajando…"
     const val UPDATE_PERMISSION = "Permití instalar apps desde Cuaderno y tocá de nuevo"
