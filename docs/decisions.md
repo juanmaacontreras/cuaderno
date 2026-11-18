@@ -5,6 +5,18 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-18
 
+- **Pages are added by pulling past the last one, never by writing** (origen: Juanma: "tenés
+  naturalmente una página y si scrolleo para abajo... sigo subiendo y me aparece... se va a
+  agregar una nueva página", as in Samsung Notes; the details are Claude's). Replaces "writing on
+  the last page adds the next" (2026-11-14), which also put a page he never asked for in the
+  pages panel. One finger past the end: the notebook follows at half the finger, a "+" and
+  "Tirá para agregar una página" show below it; at 96 dp the "+" fills and says "Soltá…"; letting
+  go there adds a blank page like the last one (one undo) and goes to its top, earlier it
+  springs back. Two fingers (zooming) and the pen never pull. The blank page earlier versions
+  kept at the end is left out when a notebook opens (it holds nothing); so is a blank last page
+  added now, if the notebook is closed before writing on it (origen: Claude). Emulator: both
+  stages and the new page seen.
+
 - **Another paper redraws the whole sheet** (origen: Juanma, v21: changing the paper "funciona
   horrible", it showed only after scrolling and not on the whole page). The kept pictures of the
   page (tiles) were only drawn again where a stroke changed; a new paper changes none. Now a
@@ -149,7 +161,8 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
   Samsung Notes). The title, page number and widths that do not fit go elsewhere: widths
   open by tapping the pen in use.
 - **Pages are A4** (origen: Juanma: what he always used, and it exports cleanly to PDF).
-  The notebook is A4 sheets one under the other; writing on the last adds the next.
+  The notebook is A4 sheets one under the other; writing on the last adds the next (replaced
+  2026-11-18: pulling past the last one adds it).
 - **The line has a fixed width; pressure is not drawn** (origen: Juanma: he turns pressure
   off in Samsung Notes). Pressure, tilt and time are still stored with each sample.
 - **Paper: dark, squared, by default** (origen: Claude; he did not answer dark or light).

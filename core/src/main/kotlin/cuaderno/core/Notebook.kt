@@ -180,7 +180,7 @@ object NotebookFile {
                     Page(page.text("id"), page.getValue("width").jsonPrimitive.float, page.getValue("height").jsonPrimitive.float,
                         Paper.of(page.text("paper")), StrokeCodec.decode(zip.getInputStream(strokes).use { it.readBytes() }))
                 }
-                // The blank page every notebook ends with (Document) is not a page written.
+                // A blank last page is not opened (Document), so it is not counted.
                 val blankEnd = pages.size > 1 && pages.last().jsonObject.let { page ->
                     val strokes = zip.getEntry(page.text("strokes")) ?: throw FormatException("missing '${page.text("strokes")}'")
                     StrokeCodec.decode(zip.getInputStream(strokes).use { it.readBytes() }).isEmpty()

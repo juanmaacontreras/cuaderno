@@ -39,11 +39,12 @@ class PagesPanelTest {
 
     @Before fun noFrontBuffer() { WriteActivity.lowLatency = false }
 
-    /** Three written pages, told apart by the height of their one line (100, 200, 300), and the blank one. */
+    /** Three written pages, told apart by the height of their one line (100, 200, 300). */
     private fun open(): WriteActivity {
         file.parentFile!!.mkdirs()
         val doc = Document(Notebook("nb", "Cuaderno", "2026-11-17T10:00:00-03:00", "2026-11-17T10:00:00-03:00", emptyList()))
         for ((i, y) in listOf(100f, 200f, 300f).withIndex()) {
+            if (i > 0) doc.addPage()
             doc.add(i, StrokeBuilder(Tool.PEN, Ui.BG, 1.1f).apply { add(100f, y, 0.5f, 0f); add(300f, y, 0.5f, 10f) }.build())
         }
         NotebookFile.write(file, doc.notebook("2026-11-17T10:00:00-03:00"))
@@ -86,7 +87,6 @@ class PagesPanelTest {
         assertFalse(screen.pages.open)
         openPanel(screen)
         assertTrue(screen.pages.open)
-        // The written pages; the blank one waiting at the end is not listed.
         assertEquals("Páginas · 3", (screen.pages.view.getChildAt(0) as TextView).text.toString())
         assertEquals(3, items(screen).size)
 
@@ -112,12 +112,12 @@ class PagesPanelTest {
         assertEquals(View.VISIBLE, screen.pages.menuLayer.visibility)
         find(screen.pages.menuLayer, Strings.NEW_PAGE_AFTER)!!.let { (it.parent as View).performClick() }
         assertEquals(View.GONE, screen.pages.menuLayer.visibility)
-        assertEquals(listOf(100, 0, 200, 300, 0), saved(screen))
+        assertEquals(listOf(100, 0, 200, 300), saved(screen))
         assertEquals(4, items(screen).size)
 
         items(screen)[2].performLongClick()
         find(screen.pages.menuLayer, Strings.DUPLICATE)!!.let { (it.parent as View).performClick() }
-        assertEquals(listOf(100, 0, 200, 200, 300, 0), saved(screen))
+        assertEquals(listOf(100, 0, 200, 200, 300), saved(screen))
 
         items(screen)[4].performLongClick()
         find(screen.pages.menuLayer, Strings.paperIs("cuadriculado"))!!.let { (it.parent as View).performClick() }
@@ -128,7 +128,7 @@ class PagesPanelTest {
 
         // Each is one undo.
         screen.document.undo(); screen.document.undo(); screen.document.undo()
-        assertEquals(listOf(100, 200, 300, 0), lines(screen.document.pages))
+        assertEquals(listOf(100, 200, 300), lines(screen.document.pages))
     }
 
     @Test fun holdingAPageAndDraggingItMovesIt() {
@@ -146,7 +146,7 @@ class PagesPanelTest {
         assertEquals(View.GONE, screen.pages.menuLayer.visibility)
         touch(MotionEvent.ACTION_UP, 20f + 2 * step)
         // The first page lands third.
-        assertEquals(listOf(200, 300, 100, 0), saved(screen))
+        assertEquals(listOf(200, 300, 100), saved(screen))
         assertEquals(3, items(screen).size)
     }
 }

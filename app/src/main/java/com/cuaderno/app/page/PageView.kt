@@ -20,6 +20,8 @@ import android.view.SurfaceView
 import androidx.graphics.surface.SurfaceControlCompat
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
+import com.cuaderno.app.Strings
+import com.juanma.kit.Ui
 import cuaderno.core.Document
 import cuaderno.core.Shapes
 import cuaderno.core.Stroke
@@ -89,6 +91,15 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     /** Called when the pen touches the page, to put away whatever was open over it. */
     var onPenDown: (() -> Unit)? = null
+
+    /**
+     * Pulling past the last page with a finger and letting go far enough asks for a new page
+     * (as in Samsung Notes). Whoever listens adds it to the notebook and sets [document] again.
+     */
+    var onAddPage: (() -> Unit)? = null
+    /** How far past the last page the finger has pulled the notebook, pixels; 0 when it has not. */
+    @Volatile private var pull = 0f
+    private val enough get() = PULL * resources.displayMetrics.density
 
     /** Told the page in the middle of the screen whenever that changes. On the main thread. */
     var onPageShown: ((Int) -> Unit)? = null
@@ -212,6 +223,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                     // A finger was moving the page: that was the palm landing first. Put the page back.
                     if (gesture) {
                         scale = startScale; offsetX = startX; offsetY = startY
+                        pull = 0f
                         gesture = false
                         redraw()
                     }
@@ -264,6 +276,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (penId != -1) penCancel()
+                if (pull > 0f) { pull = 0f; clamp(); redraw() }
                 penId = -1
                 ignored.clear()
                 if (gesture) release()
@@ -447,15 +460,50 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     }
 
     private fun fingers(event: MotionEvent) {
-        if (!gesture || measure(event, -1) == 0) return
+        if (!gesture) return
+        val used = measure(event, -1)
+        if (used == 0) return
         val next = if (span > 0f && startSpan > 0f) (startScale * span / startSpan).coerceIn(fit * ELASTIC_ZOOM, fit * MAX_ZOOM)
             else startScale
         // The point of the notebook under the fingers stays under them.
         offsetX = cx - (startCx - startX) * next / startScale
         offsetY = cy - (startCy - startY) * next / startScale
         scale = next
-        clamp()
+        val bottom = rangeY(next).first
+        if (used == 1 && next >= fit && offsetY < bottom) {
+            // Past the last page: the notebook follows at half the finger, and not much further than enough.
+            pull = ((bottom - offsetY) * 0.5f).coerceAtMost(enough * 1.3f)
+            clamp()
+            offsetY = bottom - pull
+        } else {
+            pull = 0f
+            clamp()
+        }
         redraw()
+    }
+
+    /** The finger let go of a pull past the last page: a new page if it went far enough, back otherwise. */
+    private fun letGo() {
+        val from = pull
+        val fromY = offsetY
+        val add = from >= enough && onAddPage != null
+        if (add) onAddPage?.invoke()
+        pull = 0f
+        val pages = document?.pages ?: return
+        // To the new page's top, or back to the end of the notebook.
+        val toY = if (add) (MARGIN * resources.displayMetrics.density - Render.top(pages, pages.size - 1) * scale)
+            .coerceIn(rangeY(scale).first, rangeY(scale).second) else rangeY(scale).first
+        settling = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = if (add) 320 else 200
+            interpolator = DecelerateInterpolator()
+            addUpdateListener {
+                val t = it.animatedValue as Float
+                if (!add) pull = from * (1 - t)
+                offsetY = fromY + (toY - fromY) * t
+                redraw()
+            }
+            start()
+        }
     }
 
     /** Moves the notebook by pixels; what a one-finger drag does. */
@@ -467,6 +515,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     /** The fingers let go: a sheet pinched smaller than the screen springs back; otherwise the page coasts. */
     private fun release() {
+        if (pull > 0f) {
+            letGo()
+            return
+        }
         if (scale < fit) {
             settle()
             return
@@ -522,8 +574,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         settling?.let {
             it.cancel()
             settling = null
-            // Caught half way back: finish it at once rather than leave the sheet small.
-            if (scale < fit) { scale = fit; clamp(); redraw() }
+            // Caught half way back: finish it at once rather than leave the sheet small or pulled.
+            if (scale < fit || pull > 0f) { scale = maxOf(scale, fit); pull = 0f; clamp(); redraw() }
         }
     }
 
@@ -561,6 +613,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             strokeJoin = Paint.Join.ROUND
         }
         private val path = Path()
+        val pullRing = Paint(Paint.ANTI_ALIAS_FLAG)
+        val pullText = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
 
         fun piece(canvas: Canvas, piece: Piece) {
             paint.color = piece.color
@@ -599,7 +653,47 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             brush.render.stroke(canvas, it.stroke)
             canvas.restore()
         }
+        val p = pull
+        if (p > 0f) pulled(canvas, brush, y + Render.height(pages) * s, height.toFloat(), p)
         return more
+    }
+
+    /**
+     * Below the last page while it is pulled: a "+" and what letting go will do. It fills in
+     * once the pull is enough. Drawn in the space between the sheet's end and the screen's.
+     */
+    private fun pulled(canvas: Canvas, brush: Brush, top: Float, bottom: Float, p: Float) {
+        if (bottom - top < 1f) return
+        val d = resources.displayMetrics.density
+        val ready = p >= enough
+        val fade = (p / enough).coerceIn(0f, 1f)
+        val cx = width / 2f
+        val r = 22f * d
+        val cy = (top + bottom) / 2f - 14f * d
+        val ring = brush.pullRing
+        ring.alpha = 255
+        if (ready) {
+            ring.style = Paint.Style.FILL
+            ring.color = Ui.ACCENT
+        } else {
+            ring.style = Paint.Style.STROKE
+            ring.strokeWidth = 2f * d
+            ring.color = Ui.DIM
+        }
+        ring.alpha = (255 * fade).toInt()
+        canvas.drawCircle(cx, cy, r, ring)
+        ring.style = Paint.Style.STROKE
+        ring.strokeWidth = 2.5f * d
+        ring.strokeCap = Paint.Cap.ROUND
+        ring.color = if (ready) Ui.BG else Ui.TEXT
+        ring.alpha = (255 * fade).toInt()
+        canvas.drawLine(cx - 9f * d, cy, cx + 9f * d, cy, ring)
+        canvas.drawLine(cx, cy - 9f * d, cx, cy + 9f * d, ring)
+        val text = brush.pullText
+        text.textSize = 15f * d
+        text.color = if (ready) Ui.TEXT else Ui.DIM
+        text.alpha = (255 * fade).toInt()
+        canvas.drawText(if (ready) Strings.PULL_LET_GO else Strings.PULL_MORE, cx, cy + r + 26f * d, text)
     }
 
     /** The view as an image, for tests and renders. */
@@ -763,6 +857,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     private companion object {
         /** dp around the sheet. */
         const val MARGIN = 8f
+        /** How far past the last page to pull for a new one, dp. */
+        const val PULL = 96f
         /** dp the eraser reaches around the pen tip. */
         const val RUB = 10f
         /** Holding the pen this long, this still (dp), at the end of a stroke tidies it. */

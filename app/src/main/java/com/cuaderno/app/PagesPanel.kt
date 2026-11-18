@@ -97,15 +97,10 @@ class PagesPanel(
         view.visibility = View.GONE
     }
 
-    /**
-     * Builds the list again from the notebook as it is now. Does nothing while closed. The
-     * blank page always waiting at the end is left out, as the library counts them: it is
-     * reached by writing on.
-     */
+    /** Builds the list again from the notebook as it is now. Does nothing while closed. */
     fun refresh() {
         if (!open) return
-        val all = document().pages
-        val pages = if (all.size > 1 && all.last().strokes.isEmpty()) all.dropLast(1) else all
+        val pages = document().pages
         title.text = Strings.pagesTitle(pages.size)
         val dark = page.darkPaper
         if (dark != drawnDark) { pictures.clear(); drawnDark = dark }

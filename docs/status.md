@@ -23,6 +23,10 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Pull past the last page for a new one (v23) and the paper redrawn at once (v22): tested
+  (`PageViewTest.pullingPastTheLastPageAddsOne`, `DocumentTest`, `TilesTest`), each seen
+  failing with the code broken on purpose, and on the emulator. Not on the tablet; a pinch at the
+  end not pulling is read in the code, not tested.
 - Pages panel (v21): tested (core: insert, duplicate, move, paper, each one undo; app
   `PagesPanelTest`: open, list without the blank end, tap goes to the page, the hold menu, drag
   to move, all saved), three checks seen failing with the code broken on purpose. Emulator:

@@ -195,6 +195,8 @@ class PageViewTest {
 
     @Test fun thePageCoastsAfterAFlickAndATouchStopsIt() {
         val view = page()
+        repeat(3) { view.document!!.addPage() }  // room to coast, away from the end
+        view.document = view.document
         fun flick(y0: Float, y1: Float, stepMs: Long) {
             touch(view, MotionEvent.ACTION_DOWN, 600f, y0, MotionEvent.TOOL_TYPE_FINGER)
             for (i in 1..6) {
@@ -287,7 +289,9 @@ class PageViewTest {
 
     @Test fun writingLowerDownLandsOnTheNextPage() {
         val view = page()
-        line(view, 208f, 208f, 408f, 208f)          // page 1 gets ink, page 2 appears
+        line(view, 208f, 208f, 408f, 208f)          // page 1 gets ink
+        view.document!!.addPage(); view.document!!.addPage()
+        view.document = view.document
         view.scrollBy(0f, -(842f + Render.GAP) * 2f)  // page 2 now where page 1 was
         line(view, 208f, 208f, 408f, 208f)
         val pages = view.document!!.pages
@@ -354,5 +358,37 @@ class PageViewTest {
         val perSample = (System.nanoTime() - start) / 1e6 / (5 * recording.samples.size)
         println("pen sample cost: %.4f ms".format(perSample))
         assertTrue("a pen sample costs $perSample ms", perSample < 1.0)
+    }
+
+    /** One finger up past the last page: far enough and let go adds a page and goes to it; not enough springs back. */
+    @Test fun pullingPastTheLastPageAddsOne() {
+        val view = page()
+        var asked = 0
+        view.onAddPage = { asked++; view.document!!.addPage(); view.document = view.document }
+        val bottom = view.offsetY.let { view.scrollBy(0f, -100000f); view.offsetY }
+        fun pull(by: Float) {
+            touch(view, MotionEvent.ACTION_DOWN, 600f, 700f, MotionEvent.TOOL_TYPE_FINGER)
+            for (i in 1..8) {
+                org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(40))
+                touch(view, MotionEvent.ACTION_MOVE, 600f, 700f - by * i / 8, MotionEvent.TOOL_TYPE_FINGER)
+            }
+            touch(view, MotionEvent.ACTION_UP, 600f, 700f - by, MotionEvent.TOOL_TYPE_FINGER)
+        }
+        // A little: nothing added, back to the end.
+        pull(80f)
+        idle(400)
+        assertEquals(0, asked)
+        assertEquals(1, view.document!!.pages.size)
+        assertEquals(bottom, view.offsetY, 0.5f)
+        // Enough (96 dp at half the finger): a page, and the new page's top on screen.
+        pull(400f)
+        idle(500)
+        assertEquals(1, asked)
+        assertEquals(2, view.document!!.pages.size)
+        assertEquals(1, view.currentPage)
+        // A pen never pulls.
+        drag(view, MotionEvent.TOOL_TYPE_STYLUS, 600f, 700f, 600f, 100f)
+        idle(500)
+        assertEquals(2, view.document!!.pages.size)
     }
 }
