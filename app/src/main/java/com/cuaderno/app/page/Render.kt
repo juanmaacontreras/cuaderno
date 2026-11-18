@@ -37,14 +37,18 @@ class Render {
     // not content: comparing strokes sample by sample would cost more than it saves.
     private val paths = java.util.IdentityHashMap<Stroke, Path>()
 
-    /** The whole notebook, pages one under the other, as far as [top]..[bottom] (points) is visible. */
-    fun pages(canvas: Canvas, pages: List<Page>, top: Float, bottom: Float) {
+    /**
+     * The whole notebook, pages one under the other, as far as [top]..[bottom] and
+     * [left]..[right] (points) is visible.
+     */
+    fun pages(canvas: Canvas, pages: List<Page>, top: Float, bottom: Float,
+              left: Float = -Float.MAX_VALUE, right: Float = Float.MAX_VALUE) {
         var y = 0f
         for (page in pages) {
             if (y + page.height >= top && y <= bottom) {
                 canvas.save()
                 canvas.translate(0f, y)
-                page(canvas, page, top - y, bottom - y)
+                page(canvas, page, top - y, bottom - y, left, right)
                 canvas.restore()
             }
             y += page.height + GAP
@@ -52,7 +56,8 @@ class Render {
     }
 
     /** One page with its origin at the canvas origin. Ink is clipped to the sheet. */
-    fun page(canvas: Canvas, page: Page, top: Float = 0f, bottom: Float = page.height) {
+    fun page(canvas: Canvas, page: Page, top: Float = 0f, bottom: Float = page.height,
+             left: Float = -Float.MAX_VALUE, right: Float = Float.MAX_VALUE) {
         canvas.save()
         canvas.clipRect(0f, 0f, page.width, page.height)
         fill.color = if (dark) PAPER_DARK else PAPER_LIGHT
@@ -63,9 +68,10 @@ class Render {
         for (pass in Tool.entries.sortedBy { if (it == Tool.HIGHLIGHTER) 0 else 1 }) {
             for (stroke in page.strokes) {
                 if (stroke.tool != pass) continue
-                // Zoomed in, most of a page's strokes are off screen: skip them.
+                // Zoomed in, or drawing one tile, most of a page's strokes are outside: skip them.
                 val b = stroke.bounds
                 if (b[3] + stroke.width < top || b[1] - stroke.width > bottom) continue
+                if (b[2] + stroke.width < left || b[0] - stroke.width > right) continue
                 stroke(canvas, stroke)
             }
         }

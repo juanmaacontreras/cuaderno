@@ -13,11 +13,19 @@ is saved 1.5 s after a change and when leaving the screen, in `files/notebooks/
 cuaderno.cuaderno` (format 1, atomic), with the last file that opened well kept as `.bak`.
 
 Code: `core` (`Document`: pages, undo, eraser), `app/page` (`PageView`: input, zoom, the two
-display paths; `Render`: pages and strokes in points, shared by screen and PDF), `Store`,
+display paths; `Tiles`: the notebook kept drawn in pictures; `Render`: pages and strokes in
+points, shared by screen and PDF), `Store`,
 `PdfExport`, `WriteActivity`.
 
 ## Verified, and not
 
+- Tiles (v18): the page moves at 59-61 frames a second with 1500 strokes a sheet and 54-60
+  with 5000 on the emulator, against 23 and 10-12 before (`DenseNotebook`, "Medir fluidez").
+  Tested: pieced together it matches drawing at once, and keeps matching after a pen stroke
+  (painted on, nothing redrawn), highlighter, eraser, undo, redo, dark paper and a new zoom;
+  each of those checks was seen failing with the code broken on purpose. On the emulator: a
+  stroke across a seam, undo, dark paper. Not tried: pinch zoom on the tablet (adb cannot
+  pinch), and the real fluency there (he reads "Medir fluidez" on a full page).
 - Highlighter (v16): tested (seen through while writing and once lifted, the same within
   rounding; under the ink after) and tried on the emulator (front buffer see-through and
   even while the pen is down, ink sharp on top after). Renders: `tools/screens.sh`, 4 and 5.
@@ -44,8 +52,8 @@ display paths; `Render`: pages and strokes in points, shared by screen and PDF),
    them in `plan.md` when he lists them, do not build them yet.
 2. Holding the pen (v14) "feels odd, it can be improved" (Juanma): ask what exactly (too
    slow, too eager, the line following the pen, how the shape appears) before touching it.
-3. Rest of phase 1: partial eraser, a rendering cache (tiles) before notebooks
-   get long, light PDF export if he prints.
+3. Rest of phase 1: light PDF export, only if he prints. Partial eraser dropped (he never
+   uses it). Then phase 1 is his call: a whole class written in it without losing anything.
 4. Still open: the name, what else he really uses in
    Samsung Notes (`plan.md` section 3 has what he said so far), and a real pen recording
    (menu, "Grabar trazos") for the tests.

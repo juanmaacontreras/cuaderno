@@ -5,6 +5,27 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-17
 
+- **The notebook is kept drawn, in 512-pixel pictures (tiles)** (origen: plan phase 1; the
+  design is Claude's). Measured first on the emulator (host GPU, finger scroll, "Medir
+  fluidez", five A4 sheets from `DenseNotebook`): an empty page 60 frames a second, 1500
+  strokes a sheet 23 (worst frame 41-50 ms), 5000 strokes 10-12 (99-123 ms): every frame drew
+  every visible stroke. With the pictures: 60, 59-61 (worst 4-20 ms) and 54-60 (3-57 ms, the
+  slow one while new pictures come into view). The pictures are at the exact zoom, so
+  nothing is blurred at rest. A new pen stroke is painted onto the pictures it touches;
+  anything else that changes a page (eraser, undo, redo, a highlighter, which goes under the
+  ink, a new page) draws the pictures over that area again, found by comparing the page's
+  strokes before and after by identity. While the zoom changes, the old pictures are shown
+  stretched; once it stops, the sharp ones are drawn at most 6 ms a frame, and where nothing
+  stretched covers, the strokes are drawn directly as before. Each picture is drawn 8 px
+  wider all round and only its middle shown: the smoothing at a canvas's edge loses ink and
+  left a faint seam where a stroke crossed between pictures (found by the tests). Pictures
+  sit on whole pixels (up to half a pixel from before, invisible). At most 48 kept (about
+  53 MB), least recently shown first out. Also faster lifting the pen on a full page, which
+  redrew everything before (origen: Claude, reasoned, not measured: the next stroke's first
+  pieces wait for that redraw).
+- **No partial eraser** (origen: Juanma: "no la uso nunca"). The stroke eraser stays the
+  only one; phase 1 no longer includes it.
+
 - **Highlighter** (origen: plan phase 1; the look is Claude's, shown to Juanma as renders).
   A tool between the pen and the eraser, with its own five colours (Nord yellow, green,
   frost, purple, orange) and three widths (about 2, 3.5 and 5 mm; 3.5 to start, a grid

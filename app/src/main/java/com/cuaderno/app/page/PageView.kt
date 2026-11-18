@@ -522,6 +522,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     private class Brush {
         val render = Render()
+        val tiles = Tiles(render)
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE
             strokeCap = Paint.Cap.ROUND
@@ -544,30 +545,36 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
     }
 
-    /** The notebook where it sits on screen. Called from whichever thread draws. */
-    private fun scene(canvas: Canvas, brush: Brush, height: Int) {
+    /**
+     * The notebook where it sits on screen. Called from whichever thread draws.
+     * True if it is not final yet (pictures still to draw) and wants another frame.
+     */
+    private fun scene(canvas: Canvas, brush: Brush, width: Int, height: Int, patient: Boolean = false): Boolean {
         canvas.drawColor(Render.DESK)
-        val pages = document?.pages ?: return
+        val pages = document?.pages ?: return false
         val s = scale
-        if (s == 0f) return
+        if (s == 0f) return false
+        val x = offsetX
         val y = offsetY
-        canvas.save()
-        canvas.translate(offsetX, y)
-        canvas.scale(s, s)
-        brush.render.dark = darkPaper
-        brush.render.pages(canvas, pages, -y / s, (height - y) / s)
+        val dark = darkPaper
+        brush.render.dark = dark
+        val more = brush.tiles.draw(canvas, pages, dark, x, y, s, width, height, patient)
         held?.let {
+            canvas.save()
+            canvas.translate(x, y)
+            canvas.scale(s, s)
             canvas.translate(0f, it.top)
             brush.render.stroke(canvas, it.stroke)
+            canvas.restore()
         }
-        canvas.restore()
+        return more
     }
 
     /** The view as an image, for tests and renders. */
     fun snapshot(): android.graphics.Bitmap {
         val image = android.graphics.Bitmap.createBitmap(width.coerceAtLeast(1), height.coerceAtLeast(1),
             android.graphics.Bitmap.Config.ARGB_8888)
-        scene(Canvas(image), Brush(), height)
+        scene(Canvas(image), Brush(), width, height, patient = true)
         return image
     }
 
@@ -621,7 +628,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
 
         override fun onDraw(canvas: Canvas) {
-            scene(canvas, brush, height)
+            if (scene(canvas, brush, width, height)) postInvalidateOnAnimation()
             val alpha = live.firstOrNull()?.alpha ?: 1f
             if (alpha < 1f) canvas.saveLayerAlpha(null, (alpha * 255).toInt())
             for (piece in live) brush.piece(canvas, piece)
@@ -713,8 +720,12 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
 
         /** [params] are the pieces drawn since the last time; the notebook already holds that stroke. */
-        override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Piece>) =
-            scene(canvas, brush, bufferHeight)
+        override fun onDrawMultiBufferedLayer(canvas: Canvas, bufferWidth: Int, bufferHeight: Int, params: Collection<Piece>) {
+            // The view's size: the buffer may be the panel's way round, the canvas is turned to match the view.
+            val w = surface.width.takeIf { it > 0 } ?: bufferWidth
+            val h = surface.height.takeIf { it > 0 } ?: bufferHeight
+            if (scene(canvas, brush, w, h)) surface.post { redraw() }
+        }
     }
 
     private companion object {
