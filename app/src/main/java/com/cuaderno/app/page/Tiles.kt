@@ -124,7 +124,9 @@ class Tiles(private val render: Render) {
         for ((n, page) in pages.withIndex()) {
             val before = seen.getOrNull(n)
             if (page !== before) {
-                if (before == null || before.id != page.id || before.height != page.height || before.width != page.width) {
+                // Another page there, another size or another paper: the whole sheet is drawn again.
+                if (before == null || before.id != page.id || before.height != page.height || before.width != page.width ||
+                    before.paper != page.paper) {
                     stale(RectF(0f, top, maxOf(page.width, before?.width ?: 0f), top + maxOf(page.height, before?.height ?: 0f)))
                 } else {
                     changed(before, page, top)

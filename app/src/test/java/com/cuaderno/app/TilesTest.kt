@@ -124,6 +124,17 @@ class TilesTest {
         same(tiles, render, doc, dark = true, what = "then dark paper")
     }
 
+    @Test fun anotherPaperShowsOnTheWholePageAtOnce() {
+        val render = Render()
+        val tiles = Tiles(render)
+        val doc = document()
+        same(tiles, render, doc, what = "first")
+        doc.paper(0, cuaderno.core.Paper.RULED)
+        same(tiles, render, doc, what = "ruled")
+        doc.undo()
+        same(tiles, render, doc, what = "squared again")
+    }
+
     @Test fun movingThePageOnlyDrawsWhatComesIntoView() {
         val render = Render()
         val tiles = Tiles(render)
