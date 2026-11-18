@@ -4,21 +4,32 @@ Updated: 2026-11-17. Read with `CLAUDE.md` at the start of a session; update at 
 
 ## Where it is
 
-**Phase 0 closed. Phase 1 (write a page), first slice released.**
+**Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
+progress: the library is in.**
 
-The app opens on one notebook of A4 squared sheets, light (dark from the menu). Tools down the left edge: pen
-(tap it again for the three widths), eraser, five colours, undo, redo, menu (export to PDF,
+The app opens on the last notebook; the bar's top button goes to the library (subjects down
+the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
+(dark from the menu). Tools down the left edge: library, pen
+(tap it again for the three widths), highlighter, eraser, five colours, undo, redo, menu (export to PDF,
 paper light or dark, record pen strokes). The pen writes a fixed-width line; fingers move and zoom. Everything
-is saved 1.5 s after a change and when leaving the screen, in `files/notebooks/
-cuaderno.cuaderno` (format 1, atomic), with the last file that opened well kept as `.bak`.
+is saved 1.5 s after a change and when leaving the screen, in `files/notebooks/<subject>/
+<id>.cuaderno` (format 1, atomic; layout in `docs/format.md`), with the last file that opened
+well kept as `.bak`.
 
-Code: `core` (`Document`: pages, undo, eraser), `app/page` (`PageView`: input, zoom, the two
+Code: `core` (`Document`: pages, undo, eraser; `Library`: subjects and notebooks on disk), `app/page` (`PageView`: input, zoom, the two
 display paths; `Tiles`: the notebook kept drawn in pictures; `Render`: pages and strokes in
 points, shared by screen and PDF), `Store`,
-`PdfExport`, `WriteActivity`.
+`PdfExport`, `WriteActivity`, `LibraryActivity`.
 
 ## Verified, and not
 
+- Notebooks and the library (v20): tested (core `LibraryTest`, app `LibraryActivityTest`: his
+  notebook keeps opening, the bar goes to the library, a cover opens its notebook, a new one
+  lands in the subject shown with the paper chosen, rename and move keep the ink, subjects,
+  back), two checks seen failing with the code broken on purpose. Emulator: the whole way
+  (his notebook opened, library, subject typed, ruled notebook created, written, back), with
+  three fixes from it (keyboard, framed covers, light paper samples). Renders 6 and 7. Not tried
+  on the tablet.
 - Tiles (v18): the page moves at 59-61 frames a second with 1500 strokes a sheet and 54-60
   with 5000 on the emulator, against 23 and 10-12 before (`DenseNotebook`, "Medir fluidez").
   Tested: pieced together it matches drawing at once, and keeps matching after a pen stroke
@@ -46,9 +57,10 @@ points, shared by screen and PDF), `Store`,
 
 ## Next
 
-0. **Phase 2 waits for his OK on the designs** (`fase2-*.png`, decisions 2026-11-17). Then
-   build it in slices: notebooks and the library first (format: a subject per notebook, read
-   `docs/format.md`), then the pages panel, then the trash.
+0. **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
+   (v20). Next: the pages panel (bar button, thumbnails over the page, hold a page for new
+   after / duplicate / paper / trash, drag to reorder), then the trash (notebooks and pages,
+   30 days).
 1. Fluency is fine on the tablet with v11 (90 frames per second, his reading). Battery is
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write

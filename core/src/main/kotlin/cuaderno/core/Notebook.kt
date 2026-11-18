@@ -162,5 +162,39 @@ object NotebookFile {
         }
     }
 
+    /**
+     * What a list of notebooks shows, without reading every page: the title, when it changed,
+     * how many pages are written (the blank one at the end left out), and the first page (the
+     * cover). Fails like [read] on a bad file.
+     */
+    fun summary(file: File): Summary {
+        try {
+            ZipFile(file).use { zip ->
+                val entry = zip.getEntry("manifest.json") ?: throw FormatException("missing 'manifest.json'")
+                val manifest = Json.parseToJsonElement(String(zip.getInputStream(entry).use { it.readBytes() })).jsonObject
+                val format = manifest.getValue("format").jsonPrimitive.int
+                if (format > FORMAT) throw FormatException("notebook format $format, this app reads up to $FORMAT")
+                val pages = manifest.getValue("pages").jsonArray
+                val first = pages.firstOrNull()?.jsonObject?.let { page ->
+                    val strokes = zip.getEntry(page.text("strokes")) ?: throw FormatException("missing '${page.text("strokes")}'")
+                    Page(page.text("id"), page.getValue("width").jsonPrimitive.float, page.getValue("height").jsonPrimitive.float,
+                        Paper.of(page.text("paper")), StrokeCodec.decode(zip.getInputStream(strokes).use { it.readBytes() }))
+                }
+                // The blank page every notebook ends with (Document) is not a page written.
+                val blankEnd = pages.size > 1 && pages.last().jsonObject.let { page ->
+                    val strokes = zip.getEntry(page.text("strokes")) ?: throw FormatException("missing '${page.text("strokes")}'")
+                    StrokeCodec.decode(zip.getInputStream(strokes).use { it.readBytes() }).isEmpty()
+                }
+                return Summary(manifest.text("title"), manifest.text("modified"), pages.size - if (blankEnd) 1 else 0, first)
+            }
+        } catch (e: FormatException) {
+            throw e
+        } catch (e: Exception) {
+            throw FormatException("unreadable notebook: ${e.message}")
+        }
+    }
+
+    class Summary(val title: String, val modified: String, val pages: Int, val first: Page?)
+
     private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
 }

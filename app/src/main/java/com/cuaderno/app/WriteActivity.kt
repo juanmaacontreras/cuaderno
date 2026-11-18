@@ -5,8 +5,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupMenu
@@ -18,14 +16,16 @@ import com.cuaderno.app.page.Render
 import com.juanma.kit.Ui
 import com.juanma.kit.Updater
 import cuaderno.core.Document
+import cuaderno.core.Library
 import cuaderno.core.Tool
 import java.io.File
 import kotlin.concurrent.thread
 
 /**
  * The writing screen: tools down the left edge, the notebook taking the rest
- * (the layout Juanma picked, the one he has in Samsung Notes). For now there
- * is one notebook; the library comes in phase 2.
+ * (the layout Juanma picked, the one he has in Samsung Notes). It opens the
+ * notebook it is given ([NOTEBOOK]), or the last one; the bar's top button
+ * goes to the library.
  */
 class WriteActivity : Activity() {
     /** The pen's first colour is the paper's plain ink; the rest read on both papers. */
@@ -55,8 +55,12 @@ class WriteActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        store = Store(File(filesDir, "notebooks/cuaderno.cuaderno"))
+        val library = Library(LibraryActivity.notebooks(this))
+        // The first notebook, from before there were more, kept its name: it stays where it is.
+        val file = intent.getStringExtra(NOTEBOOK)?.let { File(it) } ?: library.last ?: File(library.root, "cuaderno.cuaderno")
+        store = Store(file)
         document = store.load()
+        library.last = file
 
         page = PageView(this, lowLatency)
         page.document = document
@@ -117,10 +121,7 @@ class WriteActivity : Activity() {
         super.onWindowFocusChanged(hasFocus)
         if (!hasFocus) return
         fastestScreen()
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.systemBars())
-        }
+        Screen.fullscreen(this)
     }
 
     /**
@@ -159,6 +160,12 @@ class WriteActivity : Activity() {
 
     private fun renderBar() {
         bar.removeAllViews()
+        // Saved on the way out (onPause), as when leaving the app.
+        bar.addView(Ui.tool(this, "library") {
+            startActivity(Intent(this, LibraryActivity::class.java))
+            finish()
+        })
+        bar.addView(space(10f))
         for ((tool, icon) in listOf(Tool.PEN to "pen", Tool.HIGHLIGHTER to "highlighter")) {
             val inUse = !page.erasing && page.tool == tool
             bar.addView(Ui.tool(this, icon, on = inUse) {
@@ -262,7 +269,8 @@ class WriteActivity : Activity() {
     private fun export() {
         val pages = document.pages
         val dark = page.darkPaper
-        val file = File(cacheDir, "exports/cuaderno.pdf")
+        val name = document.title.replace(Regex("[^\\p{L}\\p{N} ._-]"), "").trim().ifEmpty { "cuaderno" }
+        val file = File(cacheDir, "exports/$name.pdf")
         thread(name = "cuaderno-export") {
             val done = try { PdfExport.write(pages, file, dark) } catch (e: Exception) { null }
             runOnUiThread {
@@ -312,6 +320,8 @@ class WriteActivity : Activity() {
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
 
     companion object {
+        /** The path of the notebook to open. */
+        const val NOTEBOOK = "notebook"
         /** The tests turn this off: the front buffer needs a real screen. */
         var lowLatency = true
     }
