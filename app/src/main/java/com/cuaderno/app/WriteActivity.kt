@@ -84,6 +84,7 @@ class WriteActivity : Activity() {
         }
         pages = PagesPanel(this, page, { document }) { changed() }
         page.onPageShown = { pages.markCurrent(it) }
+        page.onAddPage = { document.addPage(); changed() }
         recorder = Recorder(this)
         recorder.addView(page, FrameLayout.LayoutParams(-1, -1))
 

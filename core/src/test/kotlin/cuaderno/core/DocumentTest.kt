@@ -22,14 +22,24 @@ class DocumentTest {
         assertFalse(doc.canUndo)
     }
 
-    @Test fun writingOnTheLastPageAddsTheNextOne() {
+    @Test fun writingNeverAddsAPageAskingDoes() {
         val doc = empty()
         doc.add(0, line(100f))
+        assertEquals(listOf("p1"), doc.pages.map { it.id })
+        doc.paper(0, Paper.RULED)
+        doc.addPage()
         assertEquals(listOf("p1", "p2"), doc.pages.map { it.id })
-        doc.add(0, line(200f))
-        assertEquals(2, doc.pages.size)
-        doc.add(1, line(100f))
-        assertEquals(3, doc.pages.size)
+        assertEquals("like the last one", Paper.RULED, doc.pages[1].paper)
+        doc.undo()
+        assertEquals(1, doc.pages.size)
+    }
+
+    @Test fun theBlankPageThatWritingUsedToAddIsNotOpened() {
+        val blank = Page("p2", Page.A4_WIDTH, Page.A4_HEIGHT, Paper.GRID, emptyList())
+        val written = empty().apply { add(0, line(100f)) }.pages.single()
+        assertEquals(listOf("p1"), Document(Notebook("n", "t", "c", "m", listOf(written, blank))).pages.map { it.id })
+        // A notebook with nothing written still opens on its one page.
+        assertEquals(1, Document(Notebook("n", "t", "c", "m", listOf(blank))).pages.size)
     }
 
     @Test fun undoAndRedoWalkTheChanges() {
@@ -65,14 +75,14 @@ class DocumentTest {
         assertTrue(doc.revision > before)
         val saved = doc.notebook("now")
         assertEquals("now", saved.modified); assertEquals("c", saved.created)
-        assertEquals(2, saved.pages.size)
-        assertEquals(2, Document(saved).pages.size)
+        assertEquals(1, saved.pages.size)
+        assertEquals(1, Document(saved).pages.size)
     }
 
-    /** Three written pages, a, b and c by the height of their one line, and the blank one at the end. */
+    /** Three written pages, a, b and c by the height of their one line. */
     private fun three(): Document {
         val doc = empty()
-        doc.add(0, line(100f)); doc.add(1, line(200f)); doc.add(2, line(300f))
+        doc.add(0, line(100f)); doc.addPage(); doc.add(1, line(200f)); doc.addPage(); doc.add(2, line(300f))
         return doc
     }
 
@@ -80,37 +90,33 @@ class DocumentTest {
 
     @Test fun pagesAreAddedDuplicatedMovedAndRepaperedAndEachIsOneUndo() {
         val doc = three()
-        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 200, 300), doc.lines())
 
         doc.insertAfter(0)
-        assertEquals(listOf(100, 0, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 0, 200, 300), doc.lines())
         assertEquals("ids stay unique", doc.pages.size, doc.pages.map { it.id }.toSet().size)
         doc.undo()
-        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 200, 300), doc.lines())
 
         doc.duplicate(1)
-        assertEquals(listOf(100, 200, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 200, 200, 300), doc.lines())
         assertTrue(doc.pages[1].strokes == doc.pages[2].strokes)
         assertEquals(doc.pages.size, doc.pages.map { it.id }.toSet().size)
         doc.undo()
 
         doc.move(2, 0)
-        assertEquals(listOf(300, 100, 200, 0), doc.lines())
+        assertEquals(listOf(300, 100, 200), doc.lines())
         doc.move(0, 2)
-        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 200, 300), doc.lines())
         doc.undo(); doc.undo()
-        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 200, 300), doc.lines())
 
         doc.paper(1, Paper.RULED)
         assertEquals(Paper.RULED, doc.pages[1].paper)
-        assertEquals(listOf(100, 200, 300, 0), doc.lines())
+        assertEquals(listOf(100, 200, 300), doc.lines())
         doc.undo()
         assertEquals(Paper.GRID, doc.pages[1].paper)
     }
 
-    @Test fun movingTheBlankPageAwayFromTheEndBringsANewOne() {
-        val doc = three()
-        doc.move(3, 0)
-        assertEquals(listOf(0, 100, 200, 300, 0), doc.lines())
-    }
+
 }

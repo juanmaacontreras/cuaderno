@@ -6,8 +6,8 @@ package cuaderno.core
  * change in place), so another thread can draw or save the list it holds
  * while writing goes on, and undo is just the previous list.
  *
- * The notebook always ends with an empty page: writing on the last one adds
- * the next, so there is no "new page" step in the middle of a class.
+ * Pages are added when he asks ([addPage], pulling past the last one; Juanma,
+ * 2026-11-18): writing never adds one by itself.
  */
 class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
     val id = notebook.id
@@ -15,7 +15,7 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
     val created = notebook.created
     private val attachments = notebook.attachments
 
-    @Volatile var pages: List<Page> = withBlankEnd(notebook.pages)
+    @Volatile var pages: List<Page> = opened(notebook.pages)
         private set
 
     /** Goes up with every change; whoever saves compares it to know if there is something new. */
@@ -48,6 +48,9 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
         change(pages.mapIndexed { i, p -> if (i == page) p.with(kept) else p }, merge)
         return true
     }
+
+    /** A blank page at the end, like the last one. */
+    fun addPage() = insertAfter(pages.size - 1)
 
     /** A blank page right after [page], with its paper. */
     fun insertAfter(page: Int) {
@@ -97,13 +100,20 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
             if (history.size > HISTORY) history.removeAt(0)
         }
         undone.clear()
-        pages = withBlankEnd(next)
+        pages = next
         revision++
     }
 
-    private fun withBlankEnd(list: List<Page>): List<Page> {
-        if (list.isNotEmpty() && list.last().strokes.isEmpty()) return list
-        return list + Page(freshId(list), Page.A4_WIDTH, Page.A4_HEIGHT, list.lastOrNull()?.paper ?: paper, emptyList())
+    /**
+     * A notebook with nothing opens on one blank page. Until v22 writing kept a blank page at
+     * the end by itself: that one is left out (it holds nothing), so it does not show as a
+     * page he never asked for. A blank last page he adds now goes the same way when the
+     * notebook is opened again.
+     */
+    private fun opened(list: List<Page>): List<Page> {
+        if (list.isEmpty()) return listOf(Page("p1", Page.A4_WIDTH, Page.A4_HEIGHT, paper, emptyList()))
+        if (list.size > 1 && list.last().strokes.isEmpty()) return list.dropLast(1)
+        return list
     }
 
     private fun freshId(list: List<Page>): String {

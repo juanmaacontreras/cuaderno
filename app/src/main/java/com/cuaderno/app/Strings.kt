@@ -54,6 +54,8 @@ object Strings {
 
     const val PAGES = "Páginas"
     fun pagesTitle(n: Int) = "Páginas · $n"
+    const val PULL_MORE = "Tirá para agregar una página"
+    const val PULL_LET_GO = "Soltá para agregar una página"
     const val NEW_PAGE_AFTER = "Página nueva después"
     const val DUPLICATE = "Duplicar"
     fun paperIs(name: String) = "Papel: $name"

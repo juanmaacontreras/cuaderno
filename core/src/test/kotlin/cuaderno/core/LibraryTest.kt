@@ -45,6 +45,7 @@ class LibraryTest {
         val file = lib.create("Rayado", null, Paper.RULED, "2026-11-01T10:00:00Z", "nb-1")
         val doc = Document(NotebookFile.read(file))
         doc.add(0, StrokeBuilder(Tool.PEN, 0, 1f).apply { add(10f, 10f, 0.5f, 0f) }.build())
+        doc.addPage()
         assertEquals(listOf(Paper.RULED, Paper.RULED), doc.pages.map { it.paper })
     }
 
