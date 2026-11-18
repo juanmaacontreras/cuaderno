@@ -46,6 +46,9 @@ points, shared by screen and PDF), `Store`,
 
 ## Next
 
+0. **Phase 2 waits for his OK on the designs** (`fase2-*.png`, decisions 2026-11-17). Then
+   build it in slices: notebooks and the library first (format: a subject per notebook, read
+   `docs/format.md`), then the pages panel, then the trash.
 1. Fluency is fine on the tablet with v11 (90 frames per second, his reading). Battery is
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write

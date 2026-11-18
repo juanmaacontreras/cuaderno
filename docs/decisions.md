@@ -5,6 +5,21 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-17
 
+- **Phase 2 (notebooks): proposal as images, waiting for his OK** (origen: Claude; started at
+  his "sigamos" after v18). `NotebooksDesignTest`, `tools/screens.sh`, `fase2-*.png`:
+  1. The library: subjects down the left (each with a colour and a count, "Todos", "Materia
+     nueva", the trash at the bottom), the open subject's notebooks as covers (the first page,
+     drawn by `Render`), "Cuaderno nuevo" top right.
+  2. A new notebook: name, subject (chips), paper (grid, ruled, dotted, blank; a corner of each
+     enlarged so the pattern shows). Grid chosen to start.
+  3. The pages: two new buttons at the top of the bar, back to the library and the pages panel.
+     The panel opens over the page (the sheet does not shrink or move), thumbnails one under
+     the other, the current one ringed. Holding a page: new page after it, duplicate, its paper,
+     to the trash. Dragging it reorders.
+  Recommended with it (origen: Claude, to confirm): the app keeps opening on the last notebook,
+  fast at the start of a class; the library is one tap away. Deleted notebooks and pages go to
+  the trash for 30 days. Today's notebook becomes the first one, he names it and picks its subject.
+
 - **The notebook is kept drawn, in 512-pixel pictures (tiles)** (origen: plan phase 1; the
   design is Claude's). Measured first on the emulator (host GPU, finger scroll, "Medir
   fluidez", five A4 sheets from `DenseNotebook`): an empty page 60 frames a second, 1500
