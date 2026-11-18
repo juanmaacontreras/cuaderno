@@ -5,6 +5,18 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-18
 
+- **The trash (third slice of phase 2)** (origen: the approved design, "Papelera" at the bottom of
+  the subjects and "Mandar a la papelera" in a page's menu; 30 days was recommended with it and
+  approved; the rest is Claude's). A notebook goes from its edit form (hold its cover), a page
+  from its menu in the pages panel; neither asks, since it comes back. The trash lists them as
+  covers with the days left; tapping one offers "Recuperar" (to its subject or its place in its
+  notebook) or "Borrar para siempre", which asks, as "Vaciar" does (plan: deleting asks). At 30
+  days they go when the library opens. Kept beside the notebooks, format 1 plus a note each
+  (`docs/format.md`). The only page of a notebook cannot go (the notebook can). A page is in the
+  trash before it leaves the notebook; undo brings it back to the notebook and leaves the trash
+  copy, so restoring that copy too would make two (nothing lost; origen: Claude). With the last
+  notebook in the trash, the app opens the latest changed one, not a new empty one.
+
 - **Pages are added by pulling past the last one, never by writing** (origen: Juanma: "tenés
   naturalmente una página y si scrolleo para abajo... sigo subiendo y me aparece... se va a
   agregar una nueva página", as in Samsung Notes; the details are Claude's). Replaces "writing on

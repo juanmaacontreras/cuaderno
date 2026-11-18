@@ -18,6 +18,7 @@ import com.juanma.kit.Updater
 import cuaderno.core.Document
 import cuaderno.core.Library
 import cuaderno.core.Tool
+import cuaderno.core.Trash
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -42,6 +43,8 @@ class WriteActivity : Activity() {
     private val updater = Updater("juanmaacontreras/cuaderno")
 
     private lateinit var store: Store
+    private lateinit var file: File
+    private lateinit var trash: Trash
     lateinit var document: Document
         private set
     lateinit var page: PageView
@@ -61,7 +64,11 @@ class WriteActivity : Activity() {
         super.onCreate(savedInstanceState)
         val library = Library(LibraryActivity.notebooks(this))
         // The first notebook, from before there were more, kept its name: it stays where it is.
-        val file = intent.getStringExtra(NOTEBOOK)?.let { File(it) } ?: library.last ?: File(library.root, "cuaderno.cuaderno")
+        // With no last one (it went to the trash), the latest changed; with none at all, a first one.
+        val file = intent.getStringExtra(NOTEBOOK)?.let { File(it) } ?: library.last
+            ?: library.notebooks().firstOrNull { it.problem == null }?.file ?: File(library.root, "cuaderno.cuaderno")
+        this.file = file
+        trash = LibraryActivity.trash(this, library)
         store = Store(file)
         document = store.load()
         library.last = file
@@ -82,7 +89,7 @@ class WriteActivity : Activity() {
                 page.postDelayed(refreshPages, 800)
             }
         }
-        pages = PagesPanel(this, page, { document }) { changed() }
+        pages = PagesPanel(this, page, { document }, { changed() }) { trashPage(it) }
         page.onPageShown = { pages.markCurrent(it) }
         page.onAddPage = { document.addPage(); changed() }
         recorder = Recorder(this)
@@ -246,6 +253,20 @@ class WriteActivity : Activity() {
     }
 
     private val refreshPages = Runnable { pages.refresh() }
+
+    /** Kept in the trash first; only once it is there does it leave the notebook. Undo brings it back here too. */
+    private fun trashPage(index: Int) {
+        val sheet = document.pages.getOrNull(index) ?: return
+        try {
+            trash.page(file, document.title, index, sheet, Screen.now())
+        } catch (e: Exception) {
+            toast(Strings.TRASH_FAILED)
+            return
+        }
+        document.remove(index)
+        changed()
+        toast(Strings.TRASHED_PAGE)
+    }
 
     /** Undo, redo and the pages panel change the notebook from outside the page. */
     private fun changed() {

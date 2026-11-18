@@ -89,6 +89,25 @@ Code: `cuaderno.core.Library`.
 Lost or unreadable, it is ignored and rebuilt: only colours, order and `last` go
 (`LibraryTest.losingTheIndexLosesNoNotebook`).
 
+## The trash
+
+`files/trash/`, beside `notebooks/` (never inside it, so it is never taken for a subject).
+Each deleted thing is two files with the same stem (`t<date digits>-<n>`):
+
+- `<stem>.cuaderno`: format 1. A deleted notebook is its own file, moved here; a deleted page is
+  kept as a notebook of that one page.
+- `<stem>.json`, written atomically before the notebook file moves:
+
+```json
+{"kind": "page", "title": "Teoría", "from": "Circuitos/nb-1.cuaderno", "page": 1, "deleted": "2026-11-18T10:00:00-03:00"}
+```
+
+`from` is where it was, relative to `notebooks/` (for a page, its notebook); `page` (pages only)
+its place, 0 first. Restoring puts a notebook back in its subject (none if that is gone) and a
+page back at its place in its notebook (a notebook of its own if that is gone too). After 30 days
+both files are deleted when the library opens. A note without its file, or unreadable, is
+skipped and its file kept. Code: `cuaderno.core.Trash`.
+
 ## Changing the format
 
 1. Raise `FORMAT` (or the strokes `VERSION`) and keep reading every older one.
@@ -98,6 +117,6 @@ Lost or unreadable, it is ignored and rebuilt: only colours, order and `last` go
 
 ## Not in format 1 yet
 
-Saved versions and trash (phase 1 and 2), PDF backgrounds and images (3 and 4), text boxes
+Saved versions (phase 1), PDF backgrounds and images (3 and 4), text boxes
 (5). Each is expected to add manifest keys or entries, with a format bump when an older
 reader would lose it.

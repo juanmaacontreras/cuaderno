@@ -38,6 +38,8 @@ class PagesPanel(
     private val document: () -> Document,
     /** The notebook changed here: save it and show it. */
     private val changed: () -> Unit,
+    /** Sends page [Int] to the trash and takes it out of the notebook. */
+    private val trashPage: (Int) -> Unit,
 ) {
     /** The panel itself, for the screen to place over the page's left side. */
     val view: LinearLayout = Ui.column(activity).apply {
@@ -212,6 +214,12 @@ class PagesPanel(
         option("add", Strings.NEW_PAGE_AFTER) { document().insertAfter(index); done() }
         option("pages", Strings.DUPLICATE) { document().duplicate(index); done() }
         option("dot", Strings.paperIs(name(sheet.paper))) { paperMenu(index) }
+        // The only page stays: a notebook has at least one (the whole notebook goes from the library).
+        if (document().pages.size > 1) option("delete", Strings.TO_TRASH, tint = Ui.RED) {
+            closeMenu()
+            trashPage(index)
+            refresh()
+        }
     }
 
     private fun paperMenu(index: Int) {
@@ -224,14 +232,14 @@ class PagesPanel(
         }
     }
 
-    private fun option(glyph: String, label: String, bold: Boolean = false, onClick: () -> Unit) {
+    private fun option(glyph: String, label: String, bold: Boolean = false, tint: Int = Ui.TEXT, onClick: () -> Unit) {
         val line = Ui.row(activity).apply {
             setPadding(dp(14f), dp(12f), dp(22f), dp(12f))
             setOnClickListener { onClick() }
         }
-        line.addView(View(activity).apply { if (glyph.isNotEmpty()) background = Icons.drawable(glyph, Ui.TEXT) },
+        line.addView(View(activity).apply { if (glyph.isNotEmpty()) background = Icons.drawable(glyph, tint) },
             LinearLayout.LayoutParams(dp(20f), dp(20f)))
-        line.addView(Ui.text(activity, label, 15f, Ui.TEXT, bold = bold).apply { setPadding(dp(14f), 0, 0, 0) })
+        line.addView(Ui.text(activity, label, 15f, tint, bold = bold).apply { setPadding(dp(14f), 0, 0, 0) })
         menu.addView(line)
     }
 

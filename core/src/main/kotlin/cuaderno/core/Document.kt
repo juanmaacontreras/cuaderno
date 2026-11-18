@@ -64,6 +64,12 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
         change(pages.toMutableList().apply { add(page + 1, Page(freshId(pages), at.width, at.height, at.paper, at.strokes)) }, merge = false)
     }
 
+    /** Takes [page] out (the trash keeps it: see [Trash.page]). The only page never goes. */
+    fun remove(page: Int) {
+        if (pages.size < 2 || page !in pages.indices) return
+        change(pages.filterIndexed { i, _ -> i != page }, merge = false)
+    }
+
     /** Changes the paper of [page]; what is written stays. */
     fun paper(page: Int, paper: Paper) {
         val at = pages.getOrNull(page) ?: return
