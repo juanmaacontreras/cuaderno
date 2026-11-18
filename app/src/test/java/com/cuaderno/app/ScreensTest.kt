@@ -121,6 +121,23 @@ class ScreensTest {
         it.newNotebook().input.setText("Guía 3 · filtros")
     }
 
+    /** The trash with a notebook and a page in it. */
+    @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")
+    @Test fun theTrash() = library("10-papelera.png") { screen ->
+        val now = java.time.OffsetDateTime.now().withNano(0)
+        val physics = screen.library.notebooks("Física II").single()
+        screen.trash.notebook(physics.file, now.minusDays(4).toString())
+        val theory = screen.library.notebooks("Circuitos").first()
+        val n = cuaderno.core.NotebookFile.read(theory.file)
+        screen.trash.page(theory.file, n.title, 0, n.pages[0], now.toString())
+        screen.toTrash(screen.library.notebooks("Circuitos").last())
+        (screen.findViewById<View>(android.R.id.content) as android.view.ViewGroup).let { content ->
+            fun find(v: View): View? = if (v is android.widget.TextView && v.text == Strings.TRASH) v
+                else (v as? android.view.ViewGroup)?.let { g -> (0 until g.childCount).firstNotNullOfOrNull { find(g.getChildAt(it)) } }
+            (find(content)!!.parent as View).performClick()
+        }
+    }
+
     /** The pages panel open over a notebook of three pages, the second held (its menu open). */
     private fun pages(activity: WriteActivity) {
         val doc = activity.document

@@ -5,7 +5,8 @@ Updated: 2026-11-17. Read with `CLAUDE.md` at the start of a session; update at 
 ## Where it is
 
 **Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
-progress: the library and the pages panel are in.**
+built: library, pages panel, pulling for a new page, trash; waiting for his week of classes
+with it.**
 
 The app opens on the last notebook; the bar's top button goes to the library (subjects down
 the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
@@ -23,6 +24,11 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Trash (v24): tested (core `TrashTest`: notebook and page there and back, subject gone,
+  notebook gone, 30 days, a broken note kept; app: from the form and the panel, restore, asking
+  before deleting for good, opening with the last notebook gone), three checks seen failing with
+  the code broken on purpose. Emulator: a page and a notebook to the trash, both back where
+  they were. Render 10. Not on the tablet.
 - Pull past the last page for a new one (v23) and the paper redrawn at once (v22): tested
   (`PageViewTest.pullingPastTheLastPageAddsOne`, `DocumentTest`, `TilesTest`), each seen
   failing with the code broken on purpose, and on the emulator. Not on the tablet; a pinch at the
@@ -68,8 +74,8 @@ points, shared by screen and PDF), `Store`,
 ## Next
 
 0. **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
-   (v20), the pages panel (v21). Next: the trash (notebooks and pages, 30 days), with "Mandar a
-   la papelera" in the library's and the panel's hold menus.
+   (v20), the pages panel (v21), the paper redrawn at once (v22), pages added by pulling (v23),
+   the trash (v24). Its test (plan): a week of classes alongside Samsung Notes. Then phase 3.
 1. Fluency is fine on the tablet with v11 (90 frames per second, his reading). Battery is
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write

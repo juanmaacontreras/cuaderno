@@ -167,4 +167,67 @@ class LibraryActivityTest {
         @Suppress("DEPRECATION") screen.onBackPressed()
         assertEquals(file.path, File(shadowOf(screen).nextStartedActivity.getStringExtra(WriteActivity.NOTEBOOK)!!).path)
     }
+
+    @Test fun aNotebookGoesToTheTrashAndComesBack() {
+        library.addSubject("Circuitos", 0)
+        val file = File(root, "Circuitos/nb-1.cuaderno")
+        written(file, "Guía 2")
+        val screen = libraryScreen()
+        val form = screen.edit(library.notebooks().single())
+        find(form.card, Strings.TO_TRASH)!!.performClick()
+        assertNull("nothing asked: it can come back", screen.dialog)
+        assertFalse(file.exists())
+        assertTrue(library.notebooks().isEmpty())
+
+        val content = screen.findViewById<View>(android.R.id.content)
+        (find(content, Strings.TRASH)!!.parent as View).performClick()
+        assertEquals(LibraryActivity.TRASH, screen.shown)
+        assertTrue(texts(content).containsAll(listOf("Guía 2", Strings.daysLeft(30))))
+        (find(content, "Guía 2")!!.parent as View).performClick()
+        find(screen.dialog!!, Strings.RESTORE)!!.performClick()
+        assertNull(screen.dialog)
+        assertTrue(file.exists())
+        assertEquals(1, NotebookFile.read(file).pages[0].strokes.size)
+        assertTrue(screen.trash.items().isEmpty())
+    }
+
+    @Test fun deletingForGoodIsAskedFirst() {
+        written(File(root, "nb-1.cuaderno"), "Guía 1")
+        written(File(root, "nb-2.cuaderno"), "Guía 2")
+        val screen = libraryScreen()
+        for (entry in library.notebooks()) screen.toTrash(entry)
+        val first = screen.trash.items().first()
+
+        screen.deleted(first)
+        find(screen.dialog!!, Strings.FOREVER)!!.performClick()
+        assertTrue(texts(screen.dialog!!).contains(Strings.FOREVER_ASK))
+        find(screen.dialog!!, Strings.CANCEL)!!.performClick()
+        assertEquals(2, screen.trash.items().size)
+
+        screen.deleted(first)
+        find(screen.dialog!!, Strings.FOREVER)!!.performClick()
+        find(screen.dialog!!, Strings.DELETE)!!.performClick()
+        assertEquals(1, screen.trash.items().size)
+
+        val content = screen.findViewById<View>(android.R.id.content)
+        (find(content, Strings.TRASH)!!.parent as View).performClick()
+        find(content, Strings.EMPTY_TRASH)!!.performClick()
+        assertEquals("asked first", 1, screen.trash.items().size)
+        find(screen.dialog!!, Strings.DELETE)!!.performClick()
+        assertTrue(screen.trash.items().isEmpty())
+    }
+
+    @Test fun withTheLastNotebookInTheTrashTheLatestOtherOneOpens() {
+        val kept = File(root, "nb-1.cuaderno")
+        written(kept, "Guía 1")
+        val gone = File(root, "nb-2.cuaderno")
+        written(gone, "Guía 2")
+        library.last = gone
+        val screen = libraryScreen()
+        screen.toTrash(library.notebooks().first { it.file.name == gone.name })
+        assertNull(library.last)
+        val opened = write()
+        assertEquals("Guía 1", opened.document.title)
+        assertFalse("no new notebook made", File(root, "cuaderno.cuaderno").exists())
+    }
 }

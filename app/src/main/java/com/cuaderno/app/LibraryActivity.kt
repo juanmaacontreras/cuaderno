@@ -22,6 +22,7 @@ import com.juanma.kit.Ui
 import cuaderno.core.Library
 import cuaderno.core.Page
 import cuaderno.core.Paper
+import cuaderno.core.Trash
 import java.io.File
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -35,6 +36,8 @@ import java.time.ZoneId
  */
 class LibraryActivity : Activity() {
     lateinit var library: Library
+        private set
+    lateinit var trash: Trash
         private set
     private val prefs by lazy { getSharedPreferences("cuaderno", MODE_PRIVATE) }
 
@@ -52,7 +55,10 @@ class LibraryActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         library = Library(notebooks(this))
-        shown = prefs.getString(SHOWN, null)?.takeIf { it == Library.NO_SUBJECT || File(library.root, it).isDirectory }
+        trash = trash(this, library)
+        // What has been in the trash 30 days goes for good (agreed with phase 2).
+        runCatching { trash.purge(Screen.now()) }
+        shown = prefs.getString(SHOWN, null)?.takeIf { it == Library.NO_SUBJECT || it == TRASH || File(library.root, it).isDirectory }
         rail = Ui.column(this).apply {
             setBackgroundColor(Ui.SURFACE)
             setPadding(dp(14f), dp(22f), dp(14f), dp(16f))
@@ -85,6 +91,7 @@ class LibraryActivity : Activity() {
         if (dialog != null) { close(); return }
         val last = library.last
         if (last != null) open(last) else @Suppress("DEPRECATION") super.onBackPressed()
+        // (A notebook deleted while it was the last one leaves none: back leaves the app.)
     }
 
     // --- the two columns --------------------------------------------------------------
@@ -104,8 +111,13 @@ class LibraryActivity : Activity() {
             rail.addView(line(Strings.NO_SUBJECT, counts[null] ?: 0, Ui.MUTED, null, shown == Library.NO_SUBJECT) { show(Library.NO_SUBJECT) })
         }
         rail.addView(line(Strings.NEW_SUBJECT, 0, null, "add", false) { newSubject() })
+        // At the bottom, away from the subjects.
+        rail.addView(View(this), LinearLayout.LayoutParams(1, 0, 1f))
+        val deleted = trash.items()
+        rail.addView(line(Strings.TRASH, deleted.size, null, "delete", shown == TRASH) { show(TRASH) })
 
         main.removeAllViews()
+        if (shown == TRASH) { trashView(deleted); return }
         val entries = if (shown == null) all else all.filter { (it.subject ?: Library.NO_SUBJECT) == shown }
         val head = Ui.row(this)
         val names = Ui.column(this)
@@ -115,20 +127,7 @@ class LibraryActivity : Activity() {
         head.addView(Ui.button(this, "+  " + Strings.NEW_NOTEBOOK, filled = true) { newNotebook() })
         main.addView(head, LinearLayout.LayoutParams(-1, -2))
 
-        val grid = Ui.column(this).apply { setPadding(0, 0, 0, dp(28f)) }
-        if (entries.isEmpty()) {
-            grid.addView(Ui.text(this, Strings.EMPTY_SUBJECT, 16f, Ui.DIM).apply { setPadding(0, dp(32f), 0, 0) })
-        }
-        val columns = maxOf(2, ((resources.configuration.screenWidthDp - 250 - 72 + 30) / (COVER + 30)))
-        var row = Ui.row(this)
-        for ((n, entry) in entries.withIndex()) {
-            if (n % columns == 0) {
-                row = Ui.row(this).apply { gravity = Gravity.TOP }
-                grid.addView(row, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(if (n == 0) 26f else 22f) })
-            }
-            row.addView(cover(entry), LinearLayout.LayoutParams(dp(COVER.toFloat()), -2).apply { marginEnd = dp(30f) })
-        }
-        main.addView(ScrollView(this).apply { addView(grid); isVerticalScrollBarEnabled = false }, LinearLayout.LayoutParams(-1, 0, 1f))
+        main.addView(grid(entries.map { cover(it) }, Strings.EMPTY_SUBJECT), LinearLayout.LayoutParams(-1, 0, 1f))
     }
 
     private fun show(subject: String?) {
@@ -159,6 +158,104 @@ class LibraryActivity : Activity() {
         background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color) }
         layoutParams = LinearLayout.LayoutParams(dp(12f), dp(12f))
     }
+
+    /** As many covers a row as fit beside the subjects. */
+    private val columns get() = maxOf(2, ((resources.configuration.screenWidthDp - 250 - 72 + 30) / (COVER + 30)))
+
+    private fun grid(cards: List<View>, empty: String): View {
+        val grid = Ui.column(this).apply { setPadding(0, 0, 0, dp(28f)) }
+        if (cards.isEmpty()) grid.addView(Ui.text(this, empty, 16f, Ui.DIM).apply { setPadding(0, dp(32f), 0, 0) })
+        var row = Ui.row(this)
+        for ((n, card) in cards.withIndex()) {
+            if (n % columns == 0) {
+                row = Ui.row(this).apply { gravity = Gravity.TOP }
+                grid.addView(row, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(if (n == 0) 26f else 22f) })
+            }
+            row.addView(card, LinearLayout.LayoutParams(dp(COVER.toFloat()), -2).apply { marginEnd = dp(30f) })
+        }
+        return ScrollView(this).apply { addView(grid); isVerticalScrollBarEnabled = false }
+    }
+
+    // --- the trash --------------------------------------------------------------------
+
+    private fun trashView(items: List<Trash.Item>) {
+        val head = Ui.row(this)
+        val names = Ui.column(this)
+        names.addView(Ui.text(this, Strings.TRASH, 28f, Ui.BRIGHT, bold = true))
+        names.addView(Ui.text(this, Strings.TRASH_NOTE, 15f, Ui.DIM))
+        head.addView(names, LinearLayout.LayoutParams(0, -2, 1f))
+        if (items.isNotEmpty()) head.addView(Ui.button(this, Strings.EMPTY_TRASH, filled = false) { emptyTrash() })
+        main.addView(head, LinearLayout.LayoutParams(-1, -2))
+        val now = Screen.now()
+        val cards = items.map { item ->
+            val card = Ui.column(this).apply { setOnClickListener { deleted(item) } }
+            val page = item.cover ?: Page("x", Page.A4_WIDTH, Page.A4_HEIGHT, Paper.BLANK, emptyList())
+            card.addView(ImageView(this).apply { setImageBitmap(thumbnail(page, COVER.toFloat())); alpha = 0.75f })
+            val name = if (item.kind == Trash.Kind.PAGE) Strings.pageOf(item.page + 1, item.title) else item.title
+            card.addView(Ui.text(this, name, 15f, Ui.BRIGHT, bold = true).apply { setPadding(0, dp(10f), 0, 0); maxLines = 2 })
+            card.addView(Ui.text(this, Strings.daysLeft(trash.daysLeft(item, now)), 13f, Ui.DIM))
+            card
+        }
+        main.addView(grid(cards, Strings.TRASH_EMPTY), LinearLayout.LayoutParams(-1, 0, 1f))
+    }
+
+    /** What can be done with something in the trash: bring it back, or delete it for good (asked first). */
+    fun deleted(item: Trash.Item): View {
+        val name = if (item.kind == Trash.Kind.PAGE) Strings.pageOf(item.page + 1, item.title) else item.title
+        val card = card(name, item.subject ?: Strings.NO_SUBJECT)
+        card.addView(buttons(
+            danger(Strings.FOREVER) { ask(Strings.FOREVER_ASK) { trash.forget(item); refresh() } },
+            Ui.button(this, Strings.RESTORE, filled = true) {
+                try {
+                    val back = trash.restore(item)
+                    close()
+                    refresh()
+                    toast(Strings.restoredTo(library.subjectOf(back) ?: Strings.NO_SUBJECT))
+                } catch (e: Exception) {
+                    close()
+                    toast(Strings.RESTORE_FAILED)
+                }
+            }), LinearLayout.LayoutParams(-1, -2))
+        present(card, 520f)
+        return card
+    }
+
+    private fun emptyTrash() = ask(Strings.EMPTY_TRASH_ASK) {
+        for (item in trash.items()) trash.forget(item)
+        refresh()
+    }
+
+    /** Asks before something that cannot be undone; [yes] runs only on "Borrar". */
+    private fun ask(question: String, yes: () -> Unit) {
+        val card = card(question, Strings.FOREVER_NOTE)
+        card.addView(buttons(
+            Ui.button(this, Strings.CANCEL, filled = false) { close() },
+            danger(Strings.DELETE) { close(); yes() }), LinearLayout.LayoutParams(-1, -2))
+        present(card, 440f)
+    }
+
+    private fun card(title: String, note: String) = Ui.column(this).apply {
+        background = Ui.rounded(Ui.SURFACE, 22f, this@LibraryActivity)
+        setPadding(dp(30f), dp(26f), dp(30f), dp(26f))
+        isClickable = true
+        addView(Ui.text(this@LibraryActivity, title, 22f, Ui.BRIGHT, bold = true))
+        addView(Ui.text(this@LibraryActivity, note, 15f, Ui.DIM).apply { setPadding(0, dp(6f), 0, 0) })
+    }
+
+    /** A row of buttons at the bottom right of a card. */
+    private fun buttons(vararg views: View) = Ui.row(this).apply {
+        setPadding(0, dp(26f), 0, 0)
+        addView(View(this@LibraryActivity), LinearLayout.LayoutParams(0, 1, 1f))
+        for ((i, view) in views.withIndex()) {
+            addView(view, LinearLayout.LayoutParams(-2, -2).apply { if (i < views.size - 1) marginEnd = dp(10f) })
+        }
+    }
+
+    /** A button for what deletes: red words, no fill. */
+    private fun danger(label: String, onClick: () -> Unit) =
+        Ui.button(this, label, filled = false, onClick = onClick).apply { setTextColor(Ui.RED) }
+
+    private fun toast(text: String) = android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_LONG).show()
 
     private fun cover(entry: Library.Entry): View {
         val card = Ui.column(this).apply {
@@ -199,7 +296,7 @@ class LibraryActivity : Activity() {
 
     /** A card over the dimmed library, with a name field, subject chips and maybe papers. */
     inner class Form(title: String, name: String, var subject: String?, withPaper: Boolean, action: String,
-                             val done: (Form) -> Unit) {
+                     onTrash: (() -> Unit)? = null, val done: (Form) -> Unit) {
         val input = EditText(this@LibraryActivity).apply {
             setText(name)
             setSelection(text.length)
@@ -236,6 +333,8 @@ class LibraryActivity : Activity() {
                 card.addView(papers)
             }
             val buttons = Ui.row(this@LibraryActivity).apply { setPadding(0, dp(26f), 0, 0) }
+            // Apart from the others, on the left: it is not what the form is for.
+            if (onTrash != null) buttons.addView(danger(Strings.TO_TRASH, onTrash))
             buttons.addView(View(this@LibraryActivity), LinearLayout.LayoutParams(0, 1, 1f))
             buttons.addView(Ui.button(this@LibraryActivity, Strings.CANCEL, filled = false) { close() },
                 LinearLayout.LayoutParams(-2, -2).apply { marginEnd = dp(10f) })
@@ -326,7 +425,8 @@ class LibraryActivity : Activity() {
 
     /** Rename a notebook or move it to another subject. */
     fun edit(entry: Library.Entry): Form {
-        val form = Form(Strings.EDIT_NOTEBOOK, entry.title, entry.subject, withPaper = false, action = Strings.SAVE) { f ->
+        val form = Form(Strings.EDIT_NOTEBOOK, entry.title, entry.subject, withPaper = false, action = Strings.SAVE,
+            onTrash = { toTrash(entry) }) { f ->
             try {
                 var file = entry.file
                 if (f.name.isNotEmpty() && f.name != entry.title) library.rename(file, f.name)
@@ -340,6 +440,18 @@ class LibraryActivity : Activity() {
         }
         present(form.card, 600f)
         return form
+    }
+
+    /** Nothing is asked: the trash keeps it 30 days, and it comes back from there. */
+    fun toTrash(entry: Library.Entry) {
+        close()
+        try {
+            trash.notebook(entry.file, Screen.now())
+            toast(Strings.TRASHED_NOTEBOOK)
+        } catch (e: Exception) {
+            toast(Strings.TRASH_FAILED)
+        }
+        refresh()
     }
 
     /** A subject: just its name. */
@@ -394,6 +506,8 @@ class LibraryActivity : Activity() {
 
     companion object {
         private const val SHOWN = "library_shown"
+        /** [shown] when the trash is. */
+        const val TRASH = "\u0000trash"
         /** Cover width, dp. */
         private const val COVER = 168
         /** Subject colours, in the order new ones take them: Nord frost, orange, green, yellow, purple, red, blue. */
@@ -401,5 +515,8 @@ class LibraryActivity : Activity() {
 
         /** Where the notebooks live. */
         fun notebooks(activity: Activity) = File(activity.filesDir, "notebooks")
+
+        /** Where deleted notebooks and pages wait 30 days: beside the notebooks, never among them. */
+        fun trash(activity: Activity, library: Library) = Trash(File(activity.filesDir, "trash"), library)
     }
 }

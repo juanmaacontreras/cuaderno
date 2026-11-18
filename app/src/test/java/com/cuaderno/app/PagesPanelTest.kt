@@ -149,4 +149,23 @@ class PagesPanelTest {
         assertEquals(listOf(200, 300, 100), saved(screen))
         assertEquals(3, items(screen).size)
     }
+
+    @Test fun aPageGoesToTheTrashAndTheOnlyOneCannot() {
+        val screen = open()
+        openPanel(screen)
+        items(screen)[1].performLongClick()
+        find(screen.pages.menuLayer, Strings.TO_TRASH)!!.let { (it.parent as View).performClick() }
+        assertEquals(listOf(100, 300), saved(screen))
+        assertEquals(2, items(screen).size)
+        val trash = LibraryActivity.trash(screen, cuaderno.core.Library(file.parentFile!!))
+        val item = trash.items().single()
+        assertEquals(1, item.page)
+        assertEquals(200f, item.cover!!.strokes.single().y(0), 0.01f)
+
+        items(screen)[1].performLongClick()
+        find(screen.pages.menuLayer, Strings.TO_TRASH)!!.let { (it.parent as View).performClick() }
+        items(screen)[0].performLongClick()
+        assertEquals("the only page has no way to the trash", null, find(screen.pages.menuLayer, Strings.TO_TRASH))
+        assertEquals(listOf(100), saved(screen))
+    }
 }
