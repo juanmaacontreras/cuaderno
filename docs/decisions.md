@@ -5,6 +5,12 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-18
 
+- **Another paper redraws the whole sheet** (origen: Juanma, v21: changing the paper "funciona
+  horrible", it showed only after scrolling and not on the whole page). The kept pictures of the
+  page (tiles) were only drawn again where a stroke changed; a new paper changes none. Now a
+  page whose paper changed is drawn again whole (`TilesTest.anotherPaperShowsOnTheWholePageAtOnce`,
+  seen failing before the fix). Emulator: squared and dotted show at once, without scrolling.
+
 - **The pages panel (second slice of phase 2)** (origen: the approved design; the details are
   Claude's). A bar button (second, under the library) opens the pages as thumbnails over the
   left of the page, so the sheet does not shrink or move; the page in view has a ring. Tap one
