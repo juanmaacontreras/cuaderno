@@ -5,8 +5,6 @@ import cuaderno.core.FormatException
 import cuaderno.core.Notebook
 import cuaderno.core.NotebookFile
 import java.io.File
-import java.time.OffsetDateTime
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -76,7 +74,7 @@ class Store(private val file: File) {
         }
     }
 
-    private fun now() = OffsetDateTime.now().truncatedTo(ChronoUnit.SECONDS).toString()
+    private fun now() = Screen.now()
 
     private companion object {
         const val DELAY_MS = 1500L

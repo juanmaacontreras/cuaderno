@@ -5,6 +5,23 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-17
 
+- **Phase 2 approved as designed** (origen: Juanma: "si está bien, mandale"). Built in three
+  slices, one PR each: notebooks and the library; the pages panel; the trash.
+- **Notebooks and the library (first slice)** (origen: the approved design; the storage is
+  Claude's). A subject is a folder and a notebook a file in it, so moving one is moving a file
+  and the notebook format stays 1; `library.json` keeps colours, order and the last notebook,
+  and is rebuilt from the folders if lost (`docs/format.md`). The app still opens on the last
+  notebook; the bar's new top button goes to the library, Android's back from the library goes
+  back to it. His notebook (`cuaderno.cuaderno`) stays where it is, under "Sin materia", until
+  he renames or moves it (hold its cover). New pages keep the paper of the last page. The cover
+  is the first page, framed (dark paper on the dark library had no edge); the paper samples in
+  the form are always light, to show the pattern. Tried on the emulator: the keyboard covered
+  the form's papers and buttons, so the form no longer opens it by itself and Enter or ✓ only
+  put it away. Not in this slice: the trash (deleting a notebook), the pages panel, the "+" for
+  a subject inside the form (subjects are made from the list). The library reads every
+  notebook's first page on the main thread: fine for tens of notebooks, to move off it if it
+  ever shows (origen: Claude).
+
 - **Phase 2 (notebooks): proposal as images, waiting for his OK** (origen: Claude; started at
   his "sigamos" after v18). `NotebooksDesignTest`, `tools/screens.sh`, `fase2-*.png`:
   1. The library: subjects down the left (each with a colour and a count, "Todos", "Materia

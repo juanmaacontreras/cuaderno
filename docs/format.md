@@ -68,6 +68,27 @@ fails with `FormatException`. It never returns half a page.
 renames it over the notebook in one step. A crash or a full disk at any point leaves the
 previous file whole (`FormatTest.aSaveThatFailsLeavesThePreviousFileWhole`).
 
+## Where notebooks live
+
+`files/notebooks/` in the app's private storage. A subject is a folder there and a notebook is
+a file in it, `<subject>/<id>.cuaderno`; a notebook right in `notebooks/` has no subject (the
+first one, `cuaderno.cuaderno`, from before subjects). Moving a notebook to another subject
+moves its file; the notebook file itself does not say its subject, so format 1 is unchanged.
+Code: `cuaderno.core.Library`.
+
+`notebooks/library.json` adds only what the folders cannot say, and is written atomically:
+
+```json
+{"subjects": [{"name": "Circuitos", "color": -7815984}], "last": "Circuitos/nb-1731880000000.cuaderno"}
+```
+
+- `subjects`: their order and colour (ARGB). A folder missing here is still a subject, after
+  these, with a colour picked by the app.
+- `last`: the notebook opened last, relative to `notebooks/`.
+
+Lost or unreadable, it is ignored and rebuilt: only colours, order and `last` go
+(`LibraryTest.losingTheIndexLosesNoNotebook`).
+
 ## Changing the format
 
 1. Raise `FORMAT` (or the strokes `VERSION`) and keep reading every older one.
