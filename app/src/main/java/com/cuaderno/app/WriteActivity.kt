@@ -47,8 +47,12 @@ class WriteActivity : Activity() {
     lateinit var page: PageView
         private set
     private lateinit var recorder: Recorder
-    private lateinit var bar: LinearLayout
+    /** The tools down the left edge. */
+    lateinit var bar: LinearLayout
+        private set
     private lateinit var widthPanel: LinearLayout
+    lateinit var pages: PagesPanel
+        private set
     private lateinit var notice: TextView
     private lateinit var updateButton: TextView
     private var update: Updater.Release? = null
@@ -72,7 +76,14 @@ class WriteActivity : Activity() {
         page.onChange = {
             store.saveSoon(document)
             renderBar()
+            // The thumbnails follow the writing a moment later, not on every stroke.
+            if (pages.open) {
+                page.removeCallbacks(refreshPages)
+                page.postDelayed(refreshPages, 800)
+            }
         }
+        pages = PagesPanel(this, page, { document }) { changed() }
+        page.onPageShown = { pages.markCurrent(it) }
         recorder = Recorder(this)
         recorder.addView(page, FrameLayout.LayoutParams(-1, -1))
 
@@ -99,13 +110,18 @@ class WriteActivity : Activity() {
         val m = Ui.dp(this, 10f)
         val area = FrameLayout(this).apply {
             addView(recorder, FrameLayout.LayoutParams(-1, -1))
+            addView(pages.view, FrameLayout.LayoutParams(Ui.dp(this@WriteActivity, 176f), -1, Gravity.START))
             addView(widthPanel, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.START).apply { setMargins(m, m, m, m) })
             addView(updateButton, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply { setMargins(m, m, m, m) })
             addView(notice, FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM or Gravity.START).apply { setMargins(m, m, m, m) })
         }
-        setContentView(Ui.row(this).apply {
-            addView(bar, LinearLayout.LayoutParams(-2, -1))
-            addView(area, LinearLayout.LayoutParams(0, -1, 1f))
+        setContentView(FrameLayout(this).apply {
+            addView(Ui.row(this@WriteActivity).apply {
+                addView(bar, LinearLayout.LayoutParams(-2, -1))
+                addView(area, LinearLayout.LayoutParams(0, -1, 1f))
+            }, FrameLayout.LayoutParams(-1, -1))
+            // A page's menu, over everything (bar included) so a tap anywhere else closes it.
+            addView(pages.menuLayer, FrameLayout.LayoutParams(-1, -1))
         })
         renderBar()
         showProblem(store.problem?.let { Strings.UNREADABLE + it })
@@ -165,6 +181,11 @@ class WriteActivity : Activity() {
             startActivity(Intent(this, LibraryActivity::class.java))
             finish()
         })
+        bar.addView(Ui.tool(this, "pages", on = pages.open) {
+            pages.toggle()
+            widthPanel.visibility = View.GONE
+            renderBar()
+        })
         bar.addView(space(10f))
         for ((tool, icon) in listOf(Tool.PEN to "pen", Tool.HIGHLIGHTER to "highlighter")) {
             val inUse = !page.erasing && page.tool == tool
@@ -223,11 +244,24 @@ class WriteActivity : Activity() {
         page.widthPt = width
     }
 
-    /** Undo and redo change the notebook from outside the page. */
+    private val refreshPages = Runnable { pages.refresh() }
+
+    /** Undo, redo and the pages panel change the notebook from outside the page. */
     private fun changed() {
         page.document = document
         store.saveSoon(document)
         renderBar()
+        pages.refresh()
+    }
+
+    @Deprecated("Still the simplest way back on every Android it runs on")
+    override fun onBackPressed() {
+        if (pages.open) {
+            pages.close()
+            renderBar()
+        } else {
+            @Suppress("DEPRECATION") super.onBackPressed()
+        }
     }
 
     private fun space(dp: Float) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, Ui.dp(this@WriteActivity, dp)) }

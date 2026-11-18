@@ -30,7 +30,9 @@ class Render {
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }
-    private val rule = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeWidth = 0.5f }
+    private val rule = Paint(Paint.ANTI_ALIAS_FLAG)
+    /** The paper's lines, in points. Small pictures of a page thicken them, or they vanish under a pixel. */
+    var ruleWidth = 0.5f
     private val fill = Paint()
     // A stroke never changes, so its path is built once and kept while the stroke is
     // around: moving the page redraws every visible stroke on every frame. By identity,
@@ -62,6 +64,7 @@ class Render {
         canvas.clipRect(0f, 0f, page.width, page.height)
         fill.color = if (dark) PAPER_DARK else PAPER_LIGHT
         rule.color = if (dark) RULE_DARK else RULE_LIGHT
+        rule.strokeWidth = ruleWidth
         canvas.drawRect(0f, 0f, page.width, page.height, fill)
         paper(canvas, page)
         // Highlighter first, so it sits under the ink like on paper and the letters stay sharp.
@@ -95,7 +98,7 @@ class Render {
                 var y = GRID
                 while (y < page.height) {
                     var x = GRID
-                    while (x < page.width) { canvas.drawCircle(x, y, 0.6f, rule); x += GRID }
+                    while (x < page.width) { canvas.drawCircle(x, y, 1.2f * ruleWidth, rule); x += GRID }
                     y += GRID
                 }
             }

@@ -61,7 +61,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     var document: Document? = null
         set(value) {
             field = value
-            display.redraw()
+            redraw()
         }
     var color = Render.INK_ON_LIGHT
 
@@ -69,7 +69,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     @Volatile var darkPaper = false
         set(value) {
             field = value
-            display.redraw()
+            redraw()
         }
     /** Line width in page points. */
     var widthPt = 1.1f
@@ -89,6 +89,38 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     /** Called when the pen touches the page, to put away whatever was open over it. */
     var onPenDown: (() -> Unit)? = null
+
+    /** Told the page in the middle of the screen whenever that changes. On the main thread. */
+    var onPageShown: ((Int) -> Unit)? = null
+    private var shownPage = -1
+
+    /** The page in the middle of the screen. */
+    val currentPage: Int
+        get() {
+            val pages = document?.pages ?: return 0
+            if (scale == 0f) return 0
+            return Render.pageAt(pages, (height / 2f - offsetY) / scale)
+        }
+
+    /** Brings [index]'s top to the top of the screen, at the zoom it has. */
+    fun showPage(index: Int) {
+        val pages = document?.pages ?: return
+        if (index !in pages.indices || scale == 0f) return
+        stopMotion()
+        offsetY = MARGIN * resources.displayMetrics.density - Render.top(pages, index) * scale
+        clamp()
+        redraw()
+    }
+
+    /** Every change to what is shown comes through here: the display, and who wants to know the page. */
+    private fun redraw() {
+        display.redraw()
+        val now = currentPage
+        if (now != shownPage) {
+            shownPage = now
+            onPageShown?.invoke(now)
+        }
+    }
 
     @Volatile var scale = 0f
         private set
@@ -158,7 +190,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             if (oldw <= 0) offsetY = margin
         }
         clamp()
-        display.redraw()
+        redraw()
     }
 
     // --- input ------------------------------------------------------------------
@@ -181,7 +213,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                     if (gesture) {
                         scale = startScale; offsetX = startX; offsetY = startY
                         gesture = false
-                        display.redraw()
+                        redraw()
                     }
                     for (i in 0 until event.pointerCount) if (i != index) ignored.add(event.getPointerId(i))
                     penId = event.getPointerId(index)
@@ -309,7 +341,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             if (it.stroke.size == 2) {
                 held = Held(Shapes.segment(it.stroke, it.stroke.x(0), it.stroke.y(0), pageX(x), pageY(y)), it.top)
                 lastX = x; lastY = y
-                display.redraw()
+                redraw()
             }
             return
         }
@@ -341,7 +373,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             return
         }
         document?.add(strokePage, shape ?: stroke.build())
-        display.redraw()
+        redraw()
         onChange?.invoke()
     }
 
@@ -352,7 +384,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         held = null
         if (builder != null) {
             builder = null
-            display.redraw()
+            redraw()
         }
     }
 
@@ -362,7 +394,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         if (rubbing || held != null) return
         val shape = Shapes.tidy(stroke.build()) ?: return
         held = Held(shape, strokeTop)
-        display.redraw()   // hides the hand-drawn stroke in the front layer and draws the shape
+        redraw()   // hides the hand-drawn stroke in the front layer and draws the shape
     }
 
     private fun rubAt(x: Float, y: Float) {
@@ -371,7 +403,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val reach = RUB * resources.displayMetrics.density / scale
         if (!doc.erase(strokePage, pageX(x), pageY(y), reach, merge = rubbed)) return
         rubbed = true
-        display.redraw()
+        redraw()
         onChange?.invoke()
     }
 
@@ -423,14 +455,14 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         offsetY = cy - (startCy - startY) * next / startScale
         scale = next
         clamp()
-        display.redraw()
+        redraw()
     }
 
     /** Moves the notebook by pixels; what a one-finger drag does. */
     fun scrollBy(dx: Float, dy: Float) {
         offsetX += dx; offsetY += dy
         clamp()
-        display.redraw()
+        redraw()
     }
 
     /** The fingers let go: a sheet pinched smaller than the screen springs back; otherwise the page coasts. */
@@ -457,7 +489,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             if (!scroller.computeScrollOffset()) return
             offsetX = scroller.currX.toFloat()
             offsetY = scroller.currY.toFloat()
-            display.redraw()
+            redraw()
             Choreographer.getInstance().postFrameCallback(this)
         }
     }
@@ -478,7 +510,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 scale = fromScale + (fit - fromScale) * t
                 offsetX = fromX + (toX - fromX) * t
                 offsetY = fromY + (toY - fromY) * t
-                display.redraw()
+                redraw()
             }
             start()
         }
@@ -491,7 +523,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             it.cancel()
             settling = null
             // Caught half way back: finish it at once rather than leave the sheet small.
-            if (scale < fit) { scale = fit; clamp(); display.redraw() }
+            if (scale < fit) { scale = fit; clamp(); redraw() }
         }
     }
 

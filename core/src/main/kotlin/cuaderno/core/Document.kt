@@ -49,6 +49,31 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
         return true
     }
 
+    /** A blank page right after [page], with its paper. */
+    fun insertAfter(page: Int) {
+        val at = pages.getOrNull(page) ?: return
+        change(pages.toMutableList().apply { add(page + 1, Page(freshId(pages), at.width, at.height, at.paper, emptyList())) }, merge = false)
+    }
+
+    /** A copy of [page], with everything written on it, right after it. */
+    fun duplicate(page: Int) {
+        val at = pages.getOrNull(page) ?: return
+        change(pages.toMutableList().apply { add(page + 1, Page(freshId(pages), at.width, at.height, at.paper, at.strokes)) }, merge = false)
+    }
+
+    /** Changes the paper of [page]; what is written stays. */
+    fun paper(page: Int, paper: Paper) {
+        val at = pages.getOrNull(page) ?: return
+        if (at.paper == paper) return
+        change(pages.mapIndexed { i, p -> if (i == page) Page(p.id, p.width, p.height, paper, p.strokes) else p }, merge = false)
+    }
+
+    /** Moves page [from] to position [to] (both counted in the list as it is now). */
+    fun move(from: Int, to: Int) {
+        if (from == to || from !in pages.indices || to !in pages.indices) return
+        change(pages.toMutableList().apply { add(to, removeAt(from)) }, merge = false)
+    }
+
     fun undo() {
         if (history.isEmpty()) return
         undone.add(pages)
@@ -78,9 +103,13 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
 
     private fun withBlankEnd(list: List<Page>): List<Page> {
         if (list.isNotEmpty() && list.last().strokes.isEmpty()) return list
+        return list + Page(freshId(list), Page.A4_WIDTH, Page.A4_HEIGHT, list.lastOrNull()?.paper ?: paper, emptyList())
+    }
+
+    private fun freshId(list: List<Page>): String {
         var n = list.size + 1
         while (list.any { it.id == "p$n" }) n++
-        return list + Page("p$n", Page.A4_WIDTH, Page.A4_HEIGHT, list.lastOrNull()?.paper ?: paper, emptyList())
+        return "p$n"
     }
 
     private companion object {

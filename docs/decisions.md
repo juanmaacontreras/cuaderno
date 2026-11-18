@@ -3,6 +3,21 @@
 Newest first. "origen" says who decided: Juanma, or Claude (a suggestion until he confirms).
 The plan (`plan.md`) is corrected here when reality contradicts it.
 
+## 2026-11-18
+
+- **The pages panel (second slice of phase 2)** (origen: the approved design; the details are
+  Claude's). A bar button (second, under the library) opens the pages as thumbnails over the
+  left of the page, so the sheet does not shrink or move; the page in view has a ring. Tap one
+  to go to it; hold one for "Página nueva después", "Duplicar" and its paper; hold and drag to
+  move it (the others step aside to show where it lands). Each is one undo. The blank page
+  always waiting at the end is not listed, as the library does not count it. "Mandar a la
+  papelera" waits for the trash (third slice): deleting a page with only undo, which dies with
+  the app, could lose notes. Thumbnails are drawn on their own thread, only while the panel is
+  open, kept for pages that did not change, and follow the writing 0.8 s after the pen stops,
+  never on each stroke (writing comes first). The paper's lines in a small picture are at least
+  a pixel wide, or ruled and squared looked the same (also the library's covers). Tried on the
+  emulator: the menu came out at the top over the panel (measured on a hidden layer), fixed.
+
 ## 2026-11-17
 
 - **Phase 2 approved as designed** (origen: Juanma: "si está bien, mandale"). Built in three

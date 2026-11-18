@@ -225,12 +225,8 @@ class NotebooksDesignTest {
     // --- 3: the pages of a notebook, beside the real writing screen ------------------------
 
     private fun pagesPanel(activity: WriteActivity) {
-        val row = (activity.findViewById<ViewGroup>(android.R.id.content).getChildAt(0)) as ViewGroup
-        val bar = row.getChildAt(0) as ViewGroup
-        // Two new buttons at the top of the bar: back to the notebooks, and the pages (open).
-        bar.addView(Ui.tool(activity, "library") {}, 0)
-        bar.addView(Ui.tool(activity, "pages", on = true) {}, 1)
-        bar.addView(Ui.gap(activity, 10f), 2)
+        // The bar has the library and pages buttons now (v20, v21).
+        val row = activity.bar.parent as ViewGroup
 
         val panel = Ui.column(activity).apply {
             setBackgroundColor(Ui.BG)

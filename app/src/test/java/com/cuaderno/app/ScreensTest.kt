@@ -51,8 +51,8 @@ class ScreensTest {
 
     /** The highlighter in use: rows marked in three colours, the ink sharp on top. */
     private fun highlight(activity: WriteActivity) {
-        val bar = activity.findViewById<View>(android.R.id.content).let { (it as android.view.ViewGroup).getChildAt(0) as android.view.ViewGroup }.getChildAt(0) as android.view.ViewGroup
-        bar.getChildAt(3).performClick()                              // the highlighter (after the library button and a gap)
+        val bar = activity.bar
+        bar.getChildAt(4).performClick()                              // the highlighter (after the library and pages buttons and a gap)
         val page = activity.page
         fun mark(color: Int, x0: Float, y0: Float, x1: Float, y1: Float) {
             page.color = color
@@ -64,7 +64,7 @@ class ScreensTest {
         mark(com.juanma.kit.Ui.GREEN, 1180f, 1088f, 1830f, 1088f)
         mark(com.juanma.kit.Ui.ACCENT, 190f, 305f, 1650f, 305f)
         page.color = com.juanma.kit.Ui.YELLOW
-        bar.getChildAt(6).performClick()                              // yellow chosen, as the bar shows it
+        bar.getChildAt(7).performClick()                              // yellow chosen, as the bar shows it
     }
 
     @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")
@@ -120,6 +120,26 @@ class ScreensTest {
     @Test fun aNewNotebook() = library("7-cuaderno-nuevo.png") {
         it.newNotebook().input.setText("Guía 3 · filtros")
     }
+
+    /** The pages panel open over a notebook of three pages, the second held (its menu open). */
+    private fun pages(activity: WriteActivity) {
+        val doc = activity.document
+        doc.duplicate(0); doc.duplicate(0)
+        doc.paper(1, cuaderno.core.Paper.RULED)
+        activity.page.document = doc
+        activity.bar.getChildAt(1).performClick()
+        activity.pages.awaitThumbnails()
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+        layout(activity.window.decorView, 2304, 1440)
+        val list = (activity.pages.view.getChildAt(1) as android.view.ViewGroup).getChildAt(0) as android.view.ViewGroup
+        list.getChildAt(1).performLongClick()
+    }
+
+    @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")
+    @Test fun thePages() = write(2304, 1440, "8-paginas.png", scale = 0.9f) { pages(it) }
+
+    @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")
+    @Test fun thePagesOnDarkPaper() = write(2304, 1440, "9-paginas-papel-oscuro.png", scale = 0.9f, dark = true) { pages(it) }
 
     private fun layout(view: View, width: Int, height: Int) {
         view.measure(
