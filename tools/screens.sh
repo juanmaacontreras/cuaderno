@@ -6,5 +6,5 @@ cd "$(dirname "$0")/.."
 
 CUADERNO_SCREENS=$(realpath -m "${1:-build/screens}")
 export CUADERNO_SCREENS
-gradle --no-daemon -q :app:testDebugUnitTest --tests 'com.cuaderno.app.ScreensTest' --tests 'com.cuaderno.app.NotebooksDesignTest'
+gradle --no-daemon -q :app:testDebugUnitTest --tests 'com.cuaderno.app.ScreensTest' --tests 'com.cuaderno.app.NotebooksDesignTest' --tests 'com.cuaderno.app.LassoDesignTest'
 ls "$CUADERNO_SCREENS"

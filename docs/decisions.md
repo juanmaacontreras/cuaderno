@@ -5,6 +5,22 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-18
 
+- **Phase 3 (lasso): proposal as images, waiting for his OK** (origen: Claude; started at his
+  "sigamos" after v24, while he tries phase 2 in class; he was asked whether PDFs (phase 4)
+  matter more and did not say). `LassoDesignTest`, `tools/screens.sh`, `fase3-*.png`, dark paper:
+  1. A lasso button in the bar, after the eraser. With it the pen draws a loop; a stroke is
+     taken when most of it is inside, so a loop that grazes a word does not take it or leave it
+     half.
+  2. Taken: a dashed box with a handle at each corner, and "Copiar · Cortar · Borrar" above.
+  3. Pen or finger dragging inside the box moves it; a corner makes it bigger or smaller (same
+     proportions); a colour in the bar recolours it. Each is one undo.
+  4. After "Copiar" or "Cortar", a "Pegar" button over the page, on any page or notebook, until
+     used; it pastes in the middle of what is in view, taken, to drag into place.
+  5. A picture (a photo of the board, a screenshot) from the menu (⋮ "Insertar imagen"),
+     placed taken, moved and sized like ink. Needs format 2 (pictures on a page).
+  Slices, one PR each: lasso, move and delete; size, colour, copy and paste; pictures.
+  Shapes (also phase 3 in the plan) wait for what feels odd about holding the pen still.
+
 - **The trash (third slice of phase 2)** (origen: the approved design, "Papelera" at the bottom of
   the subjects and "Mandar a la papelera" in a page's menu; 30 days was recommended with it and
   approved; the rest is Claude's). A notebook goes from its edit form (hold its cover), a page

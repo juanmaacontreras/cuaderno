@@ -75,7 +75,8 @@ points, shared by screen and PDF), `Store`,
 
 0. **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
    (v20), the pages panel (v21), the paper redrawn at once (v22), pages added by pulling (v23),
-   the trash (v24). Its test (plan): a week of classes alongside Samsung Notes. Then phase 3.
+   the trash (v24). Its test (plan): a week of classes alongside Samsung Notes.
+   Phase 3 (lasso) proposed as images (`fase3-*.png`, decisions 2026-11-18): waits for his OK.
 1. Fluency is fine on the tablet with v11 (90 frames per second, his reading). Battery is
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write
