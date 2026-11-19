@@ -6,7 +6,7 @@ Updated: 2026-11-19. Read with `CLAUDE.md` at the start of a session; update at 
 
 **Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
 built: library, pages panel, pulling for a new page, trash; waiting for his week of classes
-with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27).**
+with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27), pictures (v28): phase 3 built.**
 
 The app opens on the last notebook; the bar's top button goes to the library (subjects down
 the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
@@ -24,6 +24,15 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Pictures, format 2 (v28, phase 3 slice 3): tested (core: format 2 round trip with one file
+  for a picture used twice, format 1 when there is none, a missing picture file refused, the v2
+  fixture opens, duplicate/paper/trash keep pictures, the lasso takes, moves, scales and removes
+  them, clip; app: tiles follow placing, moving, scaling, undo and removing, an inserted picture
+  lands in view taken and drawn, moves, shrinks by a corner, deletes, is copied with ink),
+  three checks seen failing with the code broken on purpose (one did not at first: the pixel
+  check took light paper for the picture's red; fixed). Emulator: Android's picker, a sideways
+  EXIF photo came in upright, under the ink, shrunk by a corner, forced stop, reopened with it
+  there, the file format 2 with the picture inside. Not on the tablet; not checked in an exported PDF.
 - Lasso size, colour, copy, cut, paste (v27, phase 3 slice 2): tested (core `LassoEditTest`:
   scale around a corner with the width, recolour, clip and paste, one undo each; app
   `LassoViewTest`: a corner doubles it around the opposite one, never off the sheet or to
@@ -87,7 +96,9 @@ points, shared by screen and PDF), `Store`,
 ## Next
 
 0. **Phase 3 approved (2026-11-19), in three slices.** Done: lasso, move, delete (v26); size,
-   colour, copy, cut, paste (v27). Next: pictures (needs format 2: read `format.md` first). Juanma is away: he tries
+   colour, copy, cut, paste (v27); pictures (v28, format 2). Phase 3 is built: its test is
+   redoing an exercise rearranging parts without rewriting (plan). Shapes (also phase 3 in the
+   plan) wait for what feels odd about holding the pen still. Juanma is away: he tries
    v24..v26+ together when back, then the week of classes.
    **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
    (v20), the pages panel (v21), the paper redrawn at once (v22), pages added by pulling (v23),

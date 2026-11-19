@@ -301,4 +301,71 @@ class LassoViewTest {
         tap(view, view.pasteChip)
         assertEquals(2, strokes(view).size)
     }
+
+    // --- slice 3: pictures --------------------------------------------------------------
+
+    private fun photo(w: Int = 400, h: Int = 200): ByteArray {
+        val image = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        image.eraseColor(0xFFBF616A.toInt())
+        val out = java.io.ByteArrayOutputStream()
+        image.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+        return out.toByteArray()
+    }
+
+    @Test fun anInsertedPictureLandsInViewTakenWithTheLassoInHand() {
+        val view = page()
+        val bytes = photo()
+        view.insertPicture("pic-a.jpg", bytes, 400, 200)
+        assertTrue(view.lassoing)
+        assertEquals(listOf(0), view.selectedPictures)
+        assertEquals(View.VISIBLE, view.actions.visibility)
+        val p = view.document!!.pages[0].pictures.single()
+        assertEquals("twice as wide as tall, as the image", 2f, p.width / p.height, 0.001f)
+        assertTrue("on the sheet", p.x >= 0f && p.x + p.width <= 595f && p.y >= 0f)
+        // In the middle of what is in view: 800 pixels tall at 2 a point is 400 points from the top.
+        assertEquals(196f, p.y + p.height / 2, 1f)
+        val image = view.snapshot()
+        val red = image.getPixel((8 + (p.x + p.width / 2) * 2).toInt(), (8 + (p.y + p.height / 2) * 2).toInt())
+        // The picture's red (BF616A), not the light paper (ECEFF4, red too but blue as well).
+        assertTrue("drawn on the page: ${Integer.toHexString(red)}", (red shr 16 and 255) > 150 && (red and 255) < 150)
+        view.document!!.undo()
+        assertEquals(0, view.document!!.pages[0].pictures.size)
+    }
+
+    @Test fun aPictureMovesGrowsAndGoesLikeInk() {
+        val view = page()
+        view.insertPicture("pic-a.jpg", photo(), 400, 200)
+        val p = view.document!!.pages[0].pictures.single()
+        val cx = 8 + (p.x + p.width / 2) * 2
+        val cy = 8 + (p.y + p.height / 2) * 2
+        view.penDown(cx, cy); view.penMove(cx + 40f, cy + 60f); view.penUp()
+        val moved = view.document!!.pages[0].pictures.single()
+        assertEquals(p.x + 20f, moved.x, 0.01f); assertEquals(p.y + 30f, moved.y, 0.01f)
+        // The bottom-right handle, 8 points of room out from the corner.
+        val hx = 8 + (moved.x + moved.width + 8f) * 2
+        val hy = 8 + (moved.y + moved.height + 8f) * 2
+        view.penDown(hx, hy); view.penMove(hx - moved.width, hy - moved.height); view.penUp()
+        val smaller = view.document!!.pages[0].pictures.single()
+        assertEquals("half as big around the top-left", moved.width / 2, smaller.width, 1f)
+        assertEquals(moved.x, smaller.x, 0.01f)
+        tap(view, item(view, 2))                        // "Borrar"
+        assertEquals(0, view.document!!.pages[0].pictures.size)
+    }
+
+    @Test fun theLassoTakesPicturesWithInkAndCopiesThemToo() {
+        val view = written()
+        view.insertPicture("pic-a.jpg", photo(), 400, 200)
+        view.deselect()
+        // A loop round the whole page takes both lines and the picture.
+        loop(view, 10f, 10f, 1190f, 790f)
+        assertEquals(listOf(0, 1), view.selection)
+        assertEquals(listOf(0), view.selectedPictures)
+        tap(view, item(view, 0))                        // "Copiar"
+        view.document!!.addPage()
+        view.document = view.document
+        view.showPage(1)
+        tap(view, view.pasteChip)
+        assertEquals(1, view.document!!.pages[1].pictures.size)
+        assertEquals(2, view.document!!.pages[1].strokes.size)
+    }
 }

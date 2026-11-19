@@ -1,14 +1,14 @@
-# The notebook file (format 1)
+# The notebook file (format 2)
 
 One notebook is one file, `<name>.cuaderno`: a zip. The file is the truth; anything else the
 app keeps (library index, thumbnails) is a cache it can rebuild by reading the files.
 Code: `core/src/main/kotlin/cuaderno/core/` (`NotebookFile`, `StrokeCodec`). Tests and the
-kept fixture: `core/src/test/` (`FormatTest`, `resources/v1.cuaderno`).
+kept fixtures: `core/src/test/` (`FormatTest`, `resources/v1.cuaderno`, `resources/v2.cuaderno`).
 
 ```
 manifest.json
 pages/<page id>.strokes
-attachments/<name>          (a background PDF, images; phase 3 and 4)
+attachments/<name>          (pictures' image files since format 2; a background PDF in phase 4)
 ```
 
 ## manifest.json
@@ -33,7 +33,27 @@ attachments/<name>          (a background PDF, images; phase 3 and 4)
 - `width`, `height`: page points, 1/72 inch (A4 is 595 x 842). Every position in the file is
   in page points, never screen pixels, so a page looks the same on any device.
 - `paper`: `blank`, `ruled`, `grid` or `dotted`.
+- `pictures` (format 2, only on a page that has any): see below.
 - A reader ignores manifest keys it does not know.
+
+## Pictures (format 2)
+
+```json
+"pictures": [{"file": "attachments/pic-3290d660f1699474fef8.jpg", "x": 121.9, "y": 74.8, "width": 196.4, "height": 130.9}]
+```
+
+- In drawing order, all of them on the paper and under every stroke.
+- `x`, `y`, `width`, `height`: page points, the picture's box; the image is stretched to it
+  (the app keeps its proportions when placing and resizing).
+- `file`: an entry in the zip, `attachments/` plus a name matching `[A-Za-z0-9_.-]{1,128}`. The
+  app names a picture by its content (`pic-` and 20 hex digits of its SHA-256), so one image
+  shown twice, on one page or several, is one file. Missing or a bad name: `FormatException`.
+- The app writes JPEG, upright, at most 1600 pixels on its long side (`app/.../Pictures.kt`).
+  A reader takes any image Android can decode; one it cannot shows as an empty frame.
+- In memory each `Picture` carries its bytes, so a page copied anywhere (duplicated, to the
+  trash and back, pasted into another notebook) takes its pictures with it.
+- **A notebook without pictures is still written as format 1**, so an app from before pictures
+  keeps opening it; only a notebook with at least one picture is written as 2.
 
 ## pages/<id>.strokes
 
@@ -94,7 +114,7 @@ Lost or unreadable, it is ignored and rebuilt: only colours, order and `last` go
 `files/trash/`, beside `notebooks/` (never inside it, so it is never taken for a subject).
 Each deleted thing is two files with the same stem (`t<date digits>-<n>`):
 
-- `<stem>.cuaderno`: format 1. A deleted notebook is its own file, moved here; a deleted page is
+- `<stem>.cuaderno`: a notebook file (format 1, or 2 with pictures). A deleted notebook is its own file, moved here; a deleted page is
   kept as a notebook of that one page.
 - `<stem>.json`, written atomically before the notebook file moves:
 
@@ -115,8 +135,7 @@ skipped and its file kept. Code: `cuaderno.core.Trash`.
    writes one) into `core/src/test/resources/` and add a test that opens it.
 3. Update this file in the same PR.
 
-## Not in format 1 yet
+## Not in the format yet
 
-Saved versions (phase 1), PDF backgrounds and images (3 and 4), text boxes
-(5). Each is expected to add manifest keys or entries, with a format bump when an older
-reader would lose it.
+Saved versions (phase 1), PDF backgrounds (4), text boxes (5). Each is expected to add
+manifest keys or entries, with a format bump when an older reader would lose it.

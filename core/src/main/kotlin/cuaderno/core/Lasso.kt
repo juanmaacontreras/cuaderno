@@ -5,6 +5,11 @@ package cuaderno.core
  * when most of its samples are inside the loop, so a loop that grazes a word neither takes
  * it nor leaves it half taken. The loop closes by itself from its last point to its first.
  */
+/** What the lasso took on a page: strokes and pictures, by their indices there. */
+data class Selection(val strokes: List<Int>, val pictures: List<Int> = emptyList()) {
+    val isEmpty: Boolean get() = strokes.isEmpty() && pictures.isEmpty()
+}
+
 object Lasso {
     /** Of the samples, the share that must be inside. */
     const val MOST = 0.5f
@@ -30,6 +35,12 @@ object Lasso {
         }
     }
 
+    /** The indices of [pictures] whose middle is inside the loop. */
+    fun selectPictures(pictures: List<Picture>, loop: FloatArray): List<Int> {
+        if (loop.size < 6) return emptyList()
+        return pictures.indices.filter { contains(loop, pictures[it].x + pictures[it].width / 2, pictures[it].y + pictures[it].height / 2) }
+    }
+
     /** Whether a point is inside the closed loop (even-odd rule, so a loop drawn twice round still works). */
     fun contains(loop: FloatArray, x: Float, y: Float): Boolean {
         var inside = false
@@ -44,14 +55,17 @@ object Lasso {
         return inside
     }
 
-    /** left, top, right, bottom around [strokes], counting their width, in their points. */
-    fun bounds(strokes: List<Stroke>): FloatArray {
+    /** left, top, right, bottom around [strokes] (counting their width) and [pictures], in their points. */
+    fun bounds(strokes: List<Stroke>, pictures: List<Picture> = emptyList()): FloatArray {
         var l = Float.MAX_VALUE; var t = Float.MAX_VALUE; var r = -Float.MAX_VALUE; var b = -Float.MAX_VALUE
         for (s in strokes) {
             val box = s.bounds
             val half = s.width / 2
             l = minOf(l, box[0] - half); t = minOf(t, box[1] - half)
             r = maxOf(r, box[2] + half); b = maxOf(b, box[3] + half)
+        }
+        for (p in pictures) {
+            l = minOf(l, p.x); t = minOf(t, p.y); r = maxOf(r, p.x + p.width); b = maxOf(b, p.y + p.height)
         }
         return floatArrayOf(l, t, r, b)
     }

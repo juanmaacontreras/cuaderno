@@ -309,6 +309,7 @@ class WriteActivity : Activity() {
 
     private fun menu(anchor: View) {
         val popup = PopupMenu(this, anchor)
+        popup.menu.add(0, 5, 0, Strings.INSERT_PICTURE)
         popup.menu.add(0, 1, 0, Strings.EXPORT)
         popup.menu.add(0, 3, 1, if (page.darkPaper) Strings.PAPER_LIGHT else Strings.PAPER_DARK)
         popup.menu.add(0, 2, 2, if (recorder.recording) Strings.RECORD_STOP else Strings.RECORD)
@@ -316,6 +317,7 @@ class WriteActivity : Activity() {
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 1 -> export()
+                5 -> pickPicture()
                 2 -> if (recorder.recording) stopRecording() else recorder.begin()
                 4 -> if (page.onFluency != null) {
                     page.onFluency = null
@@ -332,6 +334,35 @@ class WriteActivity : Activity() {
             true
         }
         popup.show()
+    }
+
+    /** Android's own picker: photos, screenshots, files. The page itself asks for no permission. */
+    private fun pickPicture() {
+        val pick = Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
+        try {
+            @Suppress("DEPRECATION") startActivityForResult(pick, PICK_PICTURE)
+        } catch (e: Exception) {
+            toast(Strings.PICTURE_FAILED)
+        }
+    }
+
+    @Deprecated("Still the simplest way back on every Android it runs on")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (requestCode != PICK_PICTURE || resultCode != RESULT_OK || uri == null) return
+        thread(name = "cuaderno-picture") {
+            val ready = Pictures.prepare(this, uri)
+            runOnUiThread {
+                if (ready == null) {
+                    toast(Strings.PICTURE_FAILED)
+                } else {
+                    widthPanel.visibility = View.GONE
+                    page.insertPicture(ready.name, ready.bytes, ready.width, ready.height)
+                    renderBar()
+                }
+            }
+        }
     }
 
     private fun showProblem(text: String?) {
@@ -397,6 +428,7 @@ class WriteActivity : Activity() {
     companion object {
         /** The path of the notebook to open. */
         const val NOTEBOOK = "notebook"
+        private const val PICK_PICTURE = 7
         /** The tests turn this off: the front buffer needs a real screen. */
         var lowLatency = true
     }

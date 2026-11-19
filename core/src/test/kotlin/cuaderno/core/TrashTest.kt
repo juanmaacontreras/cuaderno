@@ -57,6 +57,23 @@ class TrashTest {
         assertEquals(listOf(100, 200, 300), lines(back))
     }
 
+    @Test fun aPageWithAPictureKeepsItThroughTheTrash() {
+        val file = written()
+        val doc = Document(NotebookFile.read(file))
+        val bytes = ByteArray(64) { it.toByte() }
+        doc.insert(1, Picture(Picture.nameFor(bytes, "jpg"), bytes, 10f, 20f, 100f, 50f))
+        NotebookFile.write(file, doc.notebook(now))
+        val sheet = doc.pages[1]
+        val item = trash.page(file, "Teoría", 1, sheet, now)
+        doc.remove(1)
+        NotebookFile.write(file, doc.notebook(now))
+        assertEquals(0, NotebookFile.read(file).pages.sumOf { it.pictures.size })
+        val back = NotebookFile.read(trash.restore(item))
+        val picture = back.pages[1].pictures.single()
+        assertEquals(10f, picture.x); assertEquals(100f, picture.width)
+        assertTrue(bytes.contentEquals(picture.bytes))
+    }
+
     @Test fun aPageComesBackToItsPlace() {
         val file = written()
         val doc = Document(NotebookFile.read(file))

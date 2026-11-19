@@ -6,6 +6,7 @@ import android.graphics.Path
 import com.juanma.kit.Ui
 import cuaderno.core.Page
 import cuaderno.core.Paper
+import cuaderno.core.Picture
 import cuaderno.core.Stroke
 import cuaderno.core.Tool
 
@@ -38,6 +39,10 @@ class Render {
     // around: moving the page redraws every visible stroke on every frame. By identity,
     // not content: comparing strokes sample by sample would cost more than it saves.
     private val paths = java.util.IdentityHashMap<Stroke, Path>()
+    // Decoded once per image file and kept, like the paths: by the bytes' identity.
+    private val images = java.util.IdentityHashMap<ByteArray, android.graphics.Bitmap?>()
+    private val smooth = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+    private val place = android.graphics.RectF()
 
     /**
      * The whole notebook, pages one under the other, as far as [top]..[bottom] and
@@ -67,6 +72,12 @@ class Render {
         rule.strokeWidth = ruleWidth
         canvas.drawRect(0f, 0f, page.width, page.height, fill)
         paper(canvas, page)
+        // Pictures on the paper, under everything written.
+        for (picture in page.pictures) {
+            if (picture.y + picture.height < top || picture.y > bottom) continue
+            if (picture.x + picture.width < left || picture.x > right) continue
+            picture(canvas, picture)
+        }
         // Highlighter first, so it sits under the ink like on paper and the letters stay sharp.
         for (pass in Tool.entries.sortedBy { if (it == Tool.HIGHLIGHTER) 0 else 1 }) {
             for (stroke in page.strokes) {
@@ -122,6 +133,30 @@ class Render {
         canvas.drawPath(paths[stroke] ?: build(stroke), paint)
     }
 
+    /** A picture where it sits. One whose file cannot be read shows as a framed blank, never a crash. */
+    fun picture(canvas: Canvas, picture: Picture) {
+        val image = if (images.containsKey(picture.bytes)) images[picture.bytes] else decode(picture.bytes).also {
+            // Few pictures are kept: they are big (a photo is a few megabytes drawn).
+            if (images.size >= MAX_IMAGES) images.clear()
+            images[picture.bytes] = it
+        }
+        place.set(picture.x, picture.y, picture.x + picture.width, picture.y + picture.height)
+        if (image != null) {
+            canvas.drawBitmap(image, null, place, smooth)
+            return
+        }
+        rule.style = Paint.Style.STROKE
+        canvas.drawRect(place, rule)
+        rule.style = Paint.Style.FILL
+    }
+
+    private fun decode(bytes: ByteArray): android.graphics.Bitmap? = try {
+        android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size,
+            android.graphics.BitmapFactory.Options().apply { inPreferredConfig = android.graphics.Bitmap.Config.RGB_565 })
+    } catch (e: Exception) {
+        null
+    }
+
     private fun build(stroke: Stroke): Path {
         // Erased and undone strokes pile up here; start again now and then rather than track them.
         if (paths.size > MAX_PATHS) paths.clear()
@@ -141,6 +176,7 @@ class Render {
         /** Points between one page and the next on screen. */
         const val GAP = 14f
         private const val MAX_PATHS = 20000
+        private const val MAX_IMAGES = 12
         /** 5 mm squares; 8 mm lines. */
         const val GRID = 14.17f
         const val LINE = 22.68f

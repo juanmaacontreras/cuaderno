@@ -93,13 +93,13 @@ class Trash(val dir: File, private val library: Library) {
             if (home.isFile) {
                 val n = NotebookFile.read(home)
                 val pages = n.pages.toMutableList()
-                pages.add(item.page.coerceIn(0, pages.size), Page(freshPage(pages), page.width, page.height, page.paper, page.strokes))
+                pages.add(item.page.coerceIn(0, pages.size), page.withId(freshPage(pages)))
                 NotebookFile.write(home, Notebook(n.id, n.title, n.created, n.modified, pages, n.attachments))
                 back = home
             } else {
                 back = free(folder, "nb-" + item.stem + Library.EXTENSION)
                 NotebookFile.write(back, Notebook(back.name.removeSuffix(Library.EXTENSION), item.title, item.deleted, item.deleted,
-                    listOf(Page("p1", page.width, page.height, page.paper, page.strokes))))
+                    listOf(page.withId("p1"))))
             }
             payload.delete()
         }

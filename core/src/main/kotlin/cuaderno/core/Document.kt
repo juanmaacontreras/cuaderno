@@ -54,49 +54,68 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
      * place in the page's order, so a highlighter stays under the ink, and so [which] still
      * names them afterwards. One undo step.
      */
-    fun move(page: Int, which: Collection<Int>, dx: Float, dy: Float) {
+    fun move(page: Int, which: Collection<Int>, dx: Float, dy: Float) = move(page, Selection(which.toList()), dx, dy)
+
+    /** Moves the strokes and pictures of [page] in [which]. Like the other [move]. */
+    fun move(page: Int, which: Selection, dx: Float, dy: Float) {
         if (dx == 0f && dy == 0f) return
-        edit(page, which) { it.moved(dx, dy) }
+        edit(page, which, { it.moved(dx, dy) }) { it.moved(dx, dy) }
     }
 
     /** Makes the strokes of [page] at [which] [k] times as big around [ax], [ay]. Like [move]. */
-    fun scale(page: Int, which: Collection<Int>, ax: Float, ay: Float, k: Float) {
+    fun scale(page: Int, which: Collection<Int>, ax: Float, ay: Float, k: Float) = scale(page, Selection(which.toList()), ax, ay, k)
+
+    fun scale(page: Int, which: Selection, ax: Float, ay: Float, k: Float) {
         if (k == 1f) return
-        edit(page, which) { it.scaled(ax, ay, k) }
+        edit(page, which, { it.scaled(ax, ay, k) }) { it.scaled(ax, ay, k) }
     }
 
     /** Gives the strokes of [page] at [which] [color]. Like [move]. */
     fun recolor(page: Int, which: Collection<Int>, color: Int) {
         val at = pages.getOrNull(page) ?: return
         if (which.all { at.strokes.getOrNull(it)?.color ?: color == color }) return
-        edit(page, which) { if (it.color == color) it else it.recolored(color) }
+        edit(page, Selection(which.toList()), { if (it.color == color) it else it.recolored(color) }) { it }
     }
 
     /** Puts [strokes] on [page], on top of what is there. One undo step. Returns their indices. */
-    fun paste(page: Int, strokes: List<Stroke>): List<Int> {
-        val at = pages.getOrNull(page) ?: return emptyList()
-        if (strokes.isEmpty()) return emptyList()
-        change(pages.mapIndexed { i, p -> if (i == page) p.with(p.strokes + strokes) else p }, merge = false)
-        return (at.strokes.size until at.strokes.size + strokes.size).toList()
+    fun paste(page: Int, strokes: List<Stroke>): List<Int> = paste(page, strokes, emptyList()).strokes
+
+    /** Puts [strokes] and [pictures] on [page], on top of what is there. One undo step. Returns where they went. */
+    fun paste(page: Int, strokes: List<Stroke>, pictures: List<Picture>): Selection {
+        val at = pages.getOrNull(page) ?: return Selection(emptyList())
+        if (strokes.isEmpty() && pictures.isEmpty()) return Selection(emptyList())
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(p.strokes + strokes, p.pictures + pictures) else p }, merge = false)
+        return Selection((at.strokes.size until at.strokes.size + strokes.size).toList(),
+            (at.pictures.size until at.pictures.size + pictures.size).toList())
     }
 
-    /** Each stroke of [page] at [which] replaced by [f] of it, in its place. One undo step. */
-    private fun edit(page: Int, which: Collection<Int>, f: (Stroke) -> Stroke) {
+    /** Each stroke and picture of [page] in [which] replaced by [f] or [g] of it, in its place. One undo step. */
+    private fun edit(page: Int, which: Selection, f: (Stroke) -> Stroke, g: (Picture) -> Picture) {
         val at = pages.getOrNull(page) ?: return
-        if (which.isEmpty()) return
-        val set = which.toHashSet()
+        if (which.isEmpty) return
+        val set = which.strokes.toHashSet()
+        val pics = which.pictures.toHashSet()
         val edited = at.strokes.mapIndexed { i, s -> if (i in set) f(s) else s }
-        change(pages.mapIndexed { i, p -> if (i == page) p.with(edited) else p }, merge = false)
+        val placed = at.pictures.mapIndexed { i, p -> if (i in pics) g(p) else p }
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(edited, placed) else p }, merge = false)
     }
 
     /** Takes the strokes of [page] at [which] (indices) away. One undo step. */
-    fun remove(page: Int, which: Collection<Int>) {
+    fun remove(page: Int, which: Collection<Int>) = remove(page, Selection(which.toList()))
+
+    /** Takes the strokes and pictures of [page] in [which] away. One undo step. */
+    fun remove(page: Int, which: Selection) {
         val at = pages.getOrNull(page) ?: return
-        val set = which.toHashSet()
+        val set = which.strokes.toHashSet()
+        val pics = which.pictures.toHashSet()
         val kept = at.strokes.filterIndexed { i, _ -> i !in set }
-        if (kept.size == at.strokes.size) return
-        change(pages.mapIndexed { i, p -> if (i == page) p.with(kept) else p }, merge = false)
+        val placed = at.pictures.filterIndexed { i, _ -> i !in pics }
+        if (kept.size == at.strokes.size && placed.size == at.pictures.size) return
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(kept, placed) else p }, merge = false)
     }
+
+    /** Puts [picture] on [page], over the others. One undo step. Returns its index among the page's pictures. */
+    fun insert(page: Int, picture: Picture): Int = paste(page, emptyList(), listOf(picture)).pictures.firstOrNull() ?: -1
 
     /** A blank page at the end, like the last one. */
     fun addPage() = insertAfter(pages.size - 1)
@@ -110,7 +129,7 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
     /** A copy of [page], with everything written on it, right after it. */
     fun duplicate(page: Int) {
         val at = pages.getOrNull(page) ?: return
-        change(pages.toMutableList().apply { add(page + 1, Page(freshId(pages), at.width, at.height, at.paper, at.strokes)) }, merge = false)
+        change(pages.toMutableList().apply { add(page + 1, at.withId(freshId(pages))) }, merge = false)
     }
 
     /** Takes [page] out (the trash keeps it: see [Trash.page]). The only page never goes. */
@@ -123,7 +142,7 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
     fun paper(page: Int, paper: Paper) {
         val at = pages.getOrNull(page) ?: return
         if (at.paper == paper) return
-        change(pages.mapIndexed { i, p -> if (i == page) Page(p.id, p.width, p.height, paper, p.strokes) else p }, merge = false)
+        change(pages.mapIndexed { i, p -> if (i == page) p.withPaper(paper) else p }, merge = false)
     }
 
     /** Moves page [from] to position [to] (both counted in the list as it is now). */
@@ -167,7 +186,7 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
      */
     private fun opened(list: List<Page>): List<Page> {
         if (list.isEmpty()) return listOf(Page("p1", Page.A4_WIDTH, Page.A4_HEIGHT, paper, emptyList()))
-        if (list.size > 1 && list.last().strokes.isEmpty()) return list.dropLast(1)
+        if (list.size > 1 && list.last().isBlank) return list.dropLast(1)
         return list
     }
 

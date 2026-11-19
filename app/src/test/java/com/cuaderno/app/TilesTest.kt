@@ -124,6 +124,41 @@ class TilesTest {
         same(tiles, render, doc, dark = true, what = "then dark paper")
     }
 
+    /** A real JPEG: a red and blue picture with a dark bar, to be seen clearly on either paper. */
+    private fun photo(): ByteArray {
+        val image = Bitmap.createBitmap(200, 100, Bitmap.Config.ARGB_8888)
+        val c = Canvas(image)
+        c.drawColor(0xFFBF616A.toInt())
+        c.drawRect(100f, 0f, 200f, 100f, android.graphics.Paint().apply { color = 0xFF5E81AC.toInt() })
+        c.drawRect(0f, 40f, 200f, 60f, android.graphics.Paint().apply { color = 0xFF2E3440.toInt() })
+        val out = java.io.ByteArrayOutputStream()
+        image.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        return out.toByteArray()
+    }
+
+    @Test fun aPictureShowsUnderTheInkAndFollowsMovingAndUndo() {
+        val render = Render()
+        val tiles = Tiles(render)
+        val doc = document()
+        same(tiles, render, doc, what = "first")
+        val bytes = photo()
+        doc.insert(0, cuaderno.core.Picture(cuaderno.core.Picture.nameFor(bytes, "jpg"), bytes, 230f, 200f, 200f, 100f))
+        same(tiles, render, doc, what = "a picture placed")
+        val shown = tiled(tiles, render, doc, false, 8f, 8f, 2f).image
+        // Inside the picture, between the strokes: its red, not the paper.
+        val red = shown.getPixel(8 + (235 * 2), 8 + (205 * 2))
+        assertTrue("the picture is drawn: ${Integer.toHexString(red)}", (red shr 16 and 255) > 150 && (red and 255) < 140)
+        val sel = cuaderno.core.Selection(emptyList(), listOf(0))
+        doc.move(0, sel, 100f, 300f)
+        same(tiles, render, doc, what = "moved: gone from where it was")
+        doc.scale(0, sel, 330f, 500f, 0.5f)
+        same(tiles, render, doc, what = "smaller")
+        doc.undo(); doc.undo()
+        same(tiles, render, doc, what = "back by undo")
+        doc.remove(0, sel)
+        same(tiles, render, doc, what = "removed")
+    }
+
     @Test fun anotherPaperShowsOnTheWholePageAtOnce() {
         val render = Render()
         val tiles = Tiles(render)
