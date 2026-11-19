@@ -5,6 +5,15 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-19
 
+- **Phase 4 proposals as rendered images** (origen: Claude, waiting for his OK;
+  `PdfDesignTest`, run by `tools/screens.sh`). 1: "Importar PDF" beside "Cuaderno nuevo"; an
+  imported PDF is a notebook in the subject shown, its cover the first page, "PDF · N páginas".
+  2: each PDF page is a sheet the size of the PDF's page, written on with every tool as usual
+  (the page shown as an image under the ink in the mock; built, the PDF itself is kept and
+  drawn with Android's `PdfRenderer`). 3: the pages panel gains "Todas · ★ · Índice"; a page is
+  marked from its menu and the star filters to the marked ones. 4: "Índice" lists the PDF's
+  own bookmarks, a tap jumps there. Export keeps the menu's "Exportar PDF", now with the PDF
+  under the ink. Proposed order: import and write on it, then export, then favourites and index.
 - **Pictures on a page, format 2 (third slice of phase 3)** (origen: the approved design, ⋮
   "Insertar imagen"; the details are Claude's). Android's own picker (no permission for the
   app); the image is turned upright from its EXIF, no longer than 1600 px, JPEG 88 (a board
