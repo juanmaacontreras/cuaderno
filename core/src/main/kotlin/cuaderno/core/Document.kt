@@ -49,6 +49,28 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
         return true
     }
 
+    /**
+     * Moves the strokes of [page] at [which] (indices) by [dx], [dy] points. They keep their
+     * place in the page's order, so a highlighter stays under the ink, and so [which] still
+     * names them afterwards. One undo step.
+     */
+    fun move(page: Int, which: Collection<Int>, dx: Float, dy: Float) {
+        val at = pages.getOrNull(page) ?: return
+        if (which.isEmpty() || (dx == 0f && dy == 0f)) return
+        val set = which.toHashSet()
+        val moved = at.strokes.mapIndexed { i, s -> if (i in set) s.moved(dx, dy) else s }
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(moved) else p }, merge = false)
+    }
+
+    /** Takes the strokes of [page] at [which] (indices) away. One undo step. */
+    fun remove(page: Int, which: Collection<Int>) {
+        val at = pages.getOrNull(page) ?: return
+        val set = which.toHashSet()
+        val kept = at.strokes.filterIndexed { i, _ -> i !in set }
+        if (kept.size == at.strokes.size) return
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(kept) else p }, merge = false)
+    }
+
     /** A blank page at the end, like the last one. */
     fun addPage() = insertAfter(pages.size - 1)
 

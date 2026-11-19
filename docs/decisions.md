@@ -3,6 +3,26 @@
 Newest first. "origen" says who decided: Juanma, or Claude (a suggestion until he confirms).
 The plan (`plan.md`) is corrected here when reality contradicts it.
 
+## 2026-11-19
+
+- **Phase 3 approved as designed** (origen: Juanma, "Sí, mandale", seeing `fase3-*.png` from
+  away from home; he cannot try builds until he is back, so slices ship one after another and
+  he tries them together). Three slices, one PR each, as proposed.
+- **The lasso, first slice: take, move, delete** (origen: the approved design; the details are
+  Claude's). A bar button after the eraser. The pen draws a dashed loop; on lifting, the strokes
+  of that page with more than half their samples inside are taken (`core` `Lasso`, even-odd, the
+  loop closing itself). A dashed box goes round them with "Borrar" above (below if there is no
+  room). Pen or one finger on the box drags it; a second finger turns it into a zoom and leaves
+  the selection where it got to; the pen landing while a finger drags puts it back (the palm,
+  as with scrolling). While dragged the strokes are drawn on their own over the notebook without
+  them, so the kept pictures are drawn again once, not every frame. The box cannot leave its
+  sheet (ink pushed off would be saved but never seen). Moved strokes keep their place in the
+  page's order (a highlighter stays under the ink); moving and deleting are one undo each. Any
+  other tool, undo, redo or Android's back lets go. Not yet: corner handles, colour, copy, cut,
+  paste (slice 2). On light paper the dashes are the deep blue: the light one was lost (seen on
+  the emulator). Found on the emulator, not by the tests: tapping "Borrar" did nothing (the page
+  took the rest of the tap); the test now taps through the page, in a window.
+
 ## 2026-11-18
 
 - **Phase 3 (lasso): proposal as images, waiting for his OK** (origen: Claude; started at his

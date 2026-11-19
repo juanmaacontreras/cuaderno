@@ -64,7 +64,7 @@ class ScreensTest {
         mark(com.juanma.kit.Ui.GREEN, 1180f, 1088f, 1830f, 1088f)
         mark(com.juanma.kit.Ui.ACCENT, 190f, 305f, 1650f, 305f)
         page.color = com.juanma.kit.Ui.YELLOW
-        bar.getChildAt(7).performClick()                              // yellow chosen, as the bar shows it
+        bar.getChildAt(8).performClick()                              // yellow chosen, as the bar shows it
     }
 
     @Config(sdk = [34], qualifiers = "w1152dp-h720dp-land-xhdpi")

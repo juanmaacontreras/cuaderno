@@ -1,12 +1,12 @@
 # Status
 
-Updated: 2026-11-17. Read with `CLAUDE.md` at the start of a session; update at the end.
+Updated: 2026-11-19. Read with `CLAUDE.md` at the start of a session; update at the end.
 
 ## Where it is
 
 **Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
 built: library, pages panel, pulling for a new page, trash; waiting for his week of classes
-with it.**
+with it. Phase 3 (lasso) approved and being built in slices: take, move and delete done (v26).**
 
 The app opens on the last notebook; the bar's top button goes to the library (subjects down
 the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
@@ -24,6 +24,13 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Lasso, take, move, delete (v26, phase 3 slice 1): tested (core `LassoTest`: mostly inside,
+  grazing, closing, dots, bounds, move keeps order and samples, one undo each; app `LassoViewTest`:
+  loop takes, pen drag, seen while dragged, finger drag vs. finger scroll, palm put back,
+  "Borrar" tapped through the page, kept on the sheet, other tool or undo lets go), four checks
+  seen failing with the code broken on purpose. Emulator: loop, pen drag, finger drag, "Borrar",
+  undo, writing after, dark and light paper. Not on the tablet; the finger drag tried with
+  adb's finger, not a real palm.
 - Trash (v24): tested (core `TrashTest`: notebook and page there and back, subject gone,
   notebook gone, 30 days, a broken note kept; app: from the form and the panel, restore, asking
   before deleting for good, opening with the last notebook gone), three checks seen failing with
@@ -73,10 +80,13 @@ points, shared by screen and PDF), `Store`,
 
 ## Next
 
-0. **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
+0. **Phase 3 approved (2026-11-19), in three slices.** Done: lasso, move, delete (v26).
+   Next: corner handles to resize, recolour with a colour in the bar, copy, cut and paste
+   ("Pegar" on any page or notebook). Then pictures (needs format 2). Juanma is away: he tries
+   v24..v26+ together when back, then the week of classes.
+   **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
    (v20), the pages panel (v21), the paper redrawn at once (v22), pages added by pulling (v23),
    the trash (v24). Its test (plan): a week of classes alongside Samsung Notes.
-   Phase 3 (lasso) proposed as images (`fase3-*.png`, decisions 2026-11-18): waits for his OK.
 1. Fluency is fine on the tablet with v11 (90 frames per second, his reading). Battery is
    not measured: he compares a class day against Samsung Notes in Android's battery screen.
    He has features in mind beyond Samsung Notes (some from GoodNotes, some new): write

@@ -2,8 +2,12 @@ package com.cuaderno.app.page
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.Path
+import android.graphics.RectF
+import android.view.Gravity
+import android.widget.TextView
 import android.animation.ValueAnimator
 import android.view.Choreographer
 import android.view.MotionEvent
@@ -23,6 +27,8 @@ import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
 import com.cuaderno.app.Strings
 import com.juanma.kit.Ui
 import cuaderno.core.Document
+import cuaderno.core.Lasso
+import cuaderno.core.Page
 import cuaderno.core.Shapes
 import cuaderno.core.Stroke
 import cuaderno.core.StrokeBuilder
@@ -32,8 +38,9 @@ import kotlin.math.roundToInt
 
 /**
  * The page being written on. The pen writes (or rubs out: its button, its
- * eraser end, or [erasing]); fingers only move and zoom the notebook, so a
- * resting palm never leaves ink.
+ * eraser end, or [erasing]; or, with [lassoing], draws a loop that takes
+ * strokes); fingers only move and zoom the notebook, so a resting palm never
+ * leaves ink.
  *
  * Strokes live in the [Document] in page points. The view only keeps where
  * the notebook sits on screen: [scale] pixels per point and the offset of
@@ -63,6 +70,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     var document: Document? = null
         set(value) {
             field = value
+            // Undo, redo or another notebook: what was taken may not be there any more.
+            deselect()
             redraw()
         }
     var color = Render.INK_ON_LIGHT
@@ -78,6 +87,41 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** Pen or highlighter: what the stylus writes with. */
     var tool = Tool.PEN
     var erasing = false
+
+    /** The pen draws a loop; what it takes can be moved (pen or finger) or deleted. */
+    var lassoing = false
+        set(value) {
+            field = value
+            if (!value) deselect()
+        }
+
+    /** Strokes the lasso took: their page and their indices in it. */
+    private class Picked(val page: Int, val which: List<Int>)
+    private var picked: Picked? = null
+    /** The indices the lasso took on [selectedPage], for the tests. */
+    val selection: List<Int> get() = picked?.which ?: emptyList()
+    val selectedPage: Int get() = picked?.page ?: -1
+
+    /** The loop being drawn: page points of [strokePage], and the same on screen. */
+    private var loop = FloatArray(256)
+    private var loopSize = 0
+    private val loopPath = Path()
+    private var looping = false
+
+    /**
+     * The taken strokes while they are being dragged: drawn on their own, following the
+     * pen or finger, over the notebook without them ([pages], the same list every frame,
+     * so the kept pictures are drawn again once and not on every move).
+     */
+    private class Lift(val page: Int, val top: Float, val strokes: List<Stroke>, val pages: List<Page>,
+                       val minX: Float, val maxX: Float, val minY: Float, val maxY: Float)
+    @Volatile private var lift: Lift? = null
+    @Volatile private var liftX = 0f
+    @Volatile private var liftY = 0f
+    private var dragFromX = 0f
+    private var dragFromY = 0f
+    /** The finger moving the selection, or -1 (the pen moves it through [penId]). */
+    private var dragFinger = -1
 
     /** Called on the main thread after the notebook changes. */
     var onChange: (() -> Unit)? = null
@@ -126,6 +170,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** Every change to what is shown comes through here: the display, and who wants to know the page. */
     private fun redraw() {
         display.redraw()
+        marks.update()
         val now = currentPage
         if (now != shownPage) {
             shownPage = now
@@ -181,11 +226,26 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     val ringShown: Boolean get() = ring.shown
 
     private val display: Display = if (lowLatency) FrontBuffer() else Buffered()
+    private val marks = Marks()
+    /** What can be done with what the lasso took, floating over it. */
+    val actions: View = Ui.row(context).apply {
+        background = Ui.rounded(Ui.RAISED, 14f, context)
+        val d = resources.displayMetrics.density
+        setPadding((6 * d).toInt(), (4 * d).toInt(), (6 * d).toInt(), (4 * d).toInt())
+        elevation = 8 * d
+        addView(Ui.text(context, Strings.DELETE, 15f, Ui.RED, bold = true).apply {
+            setPadding((16 * d).toInt(), (12 * d).toInt(), (16 * d).toInt(), (12 * d).toInt())
+            setOnClickListener { deleteSelection() }
+        })
+        visibility = GONE
+    }
 
     init {
         setBackgroundColor(Render.DESK)
         addView(display.view, LayoutParams(-1, -1))
         addView(ring, LayoutParams(-1, -1))
+        addView(marks, LayoutParams(-1, -1))
+        addView(actions, LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -206,7 +266,18 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     // --- input ------------------------------------------------------------------
 
-    override fun onInterceptTouchEvent(event: MotionEvent) = true
+    /** A touch that began on the selection's actions: theirs until it lifts, so the tap lands. */
+    private var onActions = false
+
+    /** Everything is the page's, except a touch that lands on the selection's actions. */
+    override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            onActions = actions.visibility == VISIBLE && penId == -1 &&
+                event.x >= actions.x && event.x <= actions.x + actions.width &&
+                event.y >= actions.y && event.y <= actions.y + actions.height
+        }
+        return !onActions
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val index = event.actionIndex
@@ -220,6 +291,11 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
                 if (isPen(event, index)) {
                     if (penId != -1) return true
+                    // A finger was moving the selection: the palm again. Put it back.
+                    if (dragFinger != -1) {
+                        dragFinger = -1
+                        cancelDrag()
+                    }
                     // A finger was moving the page: that was the palm landing first. Put the page back.
                     if (gesture) {
                         scale = startScale; offsetX = startX; offsetY = startY
@@ -239,6 +315,17 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 } else {
                     // A finger that lands while the pen writes is the hand: ignored until it lifts.
                     if (penId != -1) ignored.add(event.getPointerId(index))
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN && penId == -1 && onSelection(event.x, event.y)) {
+                        // One finger on what the lasso took moves it.
+                        dragFinger = event.getPointerId(index)
+                        startDrag(event.x, event.y)
+                        return true
+                    }
+                    if (dragFinger != -1) {
+                        // A second finger: zooming, not moving the selection. It stays where it got to.
+                        dragFinger = -1
+                        drop()
+                    }
                     rebase(event, -1)
                 }
             }
@@ -253,6 +340,9 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                     }
                     penMove(event.getX(i), event.getY(i), event.eventTime, event.getPressure(i),
                         event.getAxisValue(MotionEvent.AXIS_TILT, i), event.getOrientation(i))
+                } else if (dragFinger != -1) {
+                    val i = event.findPointerIndex(dragFinger)
+                    if (i >= 0) dragTo(event.getX(i), event.getY(i))
                 } else {
                     fingers(event)
                 }
@@ -262,6 +352,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 if (id == penId) {
                     penUp()
                     penId = -1
+                }
+                if (id == dragFinger) {
+                    dragFinger = -1
+                    drop()
                 }
                 ignored.remove(id)
                 if (event.actionMasked == MotionEvent.ACTION_UP) {
@@ -276,6 +370,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             }
             MotionEvent.ACTION_CANCEL -> {
                 if (penId != -1) penCancel()
+                if (dragFinger != -1) { dragFinger = -1; cancelDrag() }
                 if (pull > 0f) { pull = 0f; clamp(); redraw() }
                 penId = -1
                 ignored.clear()
@@ -324,6 +419,20 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             rubAt(x, y)
             return
         }
+        if (lassoing) {
+            if (onSelection(x, y)) {
+                startDrag(x, y)
+            } else {
+                deselect()
+                looping = true
+                loopSize = 0
+                loopPath.rewind()
+                loopPath.moveTo(x, y)
+                addLoop(x, y)
+                marks.update()
+            }
+            return
+        }
         strokeStart = timeMs
         builder = StrokeBuilder(tool, color, widthPt).also {
             it.add(pageX(x), pageY(y), pressure, 0f, tilt, orientation)
@@ -345,6 +454,16 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     fun penMove(x: Float, y: Float, timeMs: Long = 0, pressure: Float = 0.5f, tilt: Float = 0f, orientation: Float = 0f) {
         if (rubbing) {
             rubAt(x, y)
+            return
+        }
+        if (lift != null) {
+            dragTo(x, y)
+            return
+        }
+        if (looping) {
+            loopPath.lineTo(x, y)
+            addLoop(x, y)
+            marks.update()
             return
         }
         val stroke = builder ?: return
@@ -381,6 +500,15 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         timer.removeCallbacks(hold)
         val shape = held?.stroke
         held = null
+        if (lift != null) {
+            drop()
+            return
+        }
+        if (looping) {
+            looping = false
+            take()
+            return
+        }
         if (rubbing || stroke == null) {
             rubbing = false
             return
@@ -392,6 +520,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     private fun penCancel() {
         rubbing = false
+        if (looping) { looping = false; marks.update() }
+        if (lift != null) cancelDrag()
         ring.hide()
         timer.removeCallbacks(hold)
         held = null
@@ -416,6 +546,115 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val reach = RUB * resources.displayMetrics.density / scale
         if (!doc.erase(strokePage, pageX(x), pageY(y), reach, merge = rubbed)) return
         rubbed = true
+        redraw()
+        onChange?.invoke()
+    }
+
+    // --- the lasso -------------------------------------------------------------------
+
+    private fun addLoop(x: Float, y: Float) {
+        if (loopSize + 2 > loop.size) loop = loop.copyOf(loop.size * 2)
+        loop[loopSize++] = pageX(x)
+        loop[loopSize++] = pageY(y)
+    }
+
+    /** The loop is closed: take what is mostly inside it on its page. */
+    private fun take() {
+        val page = document?.pages?.getOrNull(strokePage)
+        val which = if (page == null) emptyList() else Lasso.select(page.strokes, loop.copyOf(loopSize))
+        picked = if (which.isEmpty()) null else Picked(strokePage, which)
+        marks.update()
+    }
+
+    /** Lets go of what the lasso took. True if something was taken. */
+    fun deselect(): Boolean {
+        val had = picked != null || looping
+        picked = null
+        looping = false
+        if (lift != null) cancelDrag()
+        if (had) marks.update()
+        return had
+    }
+
+    /** The box around what was taken, in page points of its page; null if nothing is. */
+    private fun box(): FloatArray? {
+        val p = picked ?: return null
+        val strokes = document?.pages?.getOrNull(p.page)?.strokes ?: return null
+        val b = Lasso.bounds(p.which.mapNotNull { strokes.getOrNull(it) })
+        val pad = BOX_PAD
+        return floatArrayOf(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad)
+    }
+
+    /** The box on screen, following a drag. */
+    private fun screenBox(out: RectF): Boolean {
+        val p = picked ?: return false
+        val b = box() ?: return false
+        val pages = document?.pages ?: return false
+        val top = Render.top(pages, p.page)
+        val dx = if (lift != null) liftX else 0f
+        val dy = if (lift != null) liftY else 0f
+        out.set(offsetX + (b[0] + dx) * scale, offsetY + (top + b[1] + dy) * scale,
+            offsetX + (b[2] + dx) * scale, offsetY + (top + b[3] + dy) * scale)
+        return true
+    }
+
+    private val hit = RectF()
+
+    /** Whether a point on screen is on what was taken (its box, a little wider for a finger). */
+    private fun onSelection(x: Float, y: Float): Boolean {
+        if (!screenBox(hit)) return false
+        val slop = HIT * resources.displayMetrics.density
+        hit.inset(-slop, -slop)
+        return hit.contains(x, y)
+    }
+
+    private fun startDrag(x: Float, y: Float) {
+        val p = picked ?: return
+        val pages = document?.pages ?: return
+        val page = pages.getOrNull(p.page) ?: return
+        val b = box() ?: return
+        val set = p.which.toHashSet()
+        val without = pages.mapIndexed { i, pg -> if (i == p.page) pg.with(pg.strokes.filterIndexed { k, _ -> k !in set }) else pg }
+        dragFromX = x; dragFromY = y
+        liftX = 0f; liftY = 0f
+        // The box stays on its sheet: ink pushed off the page would be there but never seen.
+        lift = Lift(p.page, Render.top(pages, p.page), p.which.mapNotNull { page.strokes.getOrNull(it) }, without,
+            minOf(0f, -b[0]), maxOf(0f, page.width - b[2]), minOf(0f, -b[1]), maxOf(0f, page.height - b[3]))
+        actions.visibility = GONE
+        redraw()
+    }
+
+    private fun dragTo(x: Float, y: Float) {
+        val l = lift ?: return
+        liftX = ((x - dragFromX) / scale).coerceIn(l.minX, l.maxX)
+        liftY = ((y - dragFromY) / scale).coerceIn(l.minY, l.maxY)
+        redraw()
+    }
+
+    /** Leaves the dragged strokes where they are now: one undo step. */
+    private fun drop() {
+        val l = lift ?: return
+        val p = picked
+        val dx = liftX; val dy = liftY
+        lift = null
+        if (p != null && (dx != 0f || dy != 0f)) {
+            document?.move(l.page, p.which, dx, dy)
+            onChange?.invoke()
+        }
+        redraw()
+    }
+
+    /** The drag was the palm: everything back where it was. */
+    private fun cancelDrag() {
+        if (lift == null) return
+        lift = null
+        redraw()
+    }
+
+    private fun deleteSelection() {
+        val p = picked ?: return
+        deselect()
+        document?.remove(p.page, p.which)
         redraw()
         onChange?.invoke()
     }
@@ -644,7 +883,21 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val y = offsetY
         val dark = darkPaper
         brush.render.dark = dark
-        val more = brush.tiles.draw(canvas, pages, dark, x, y, s, width, height, patient)
+        val lifted = lift
+        val more = brush.tiles.draw(canvas, lifted?.pages ?: pages, dark, x, y, s, width, height, patient)
+        lifted?.let {
+            canvas.save()
+            canvas.translate(x, y)
+            canvas.scale(s, s)
+            canvas.translate(0f, it.top)
+            val page = it.pages[it.page]
+            canvas.clipRect(0f, 0f, page.width, page.height)
+            canvas.translate(liftX, liftY)
+            // The highlighter under the ink, as on the page.
+            for (stroke in it.strokes) if (stroke.tool == Tool.HIGHLIGHTER) brush.render.stroke(canvas, stroke)
+            for (stroke in it.strokes) if (stroke.tool != Tool.HIGHLIGHTER) brush.render.stroke(canvas, stroke)
+            canvas.restore()
+        }
         held?.let {
             canvas.save()
             canvas.translate(x, y)
@@ -734,6 +987,55 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
         override fun onDraw(canvas: Canvas) {
             if (shown) canvas.drawCircle(cx, cy, RUB * resources.displayMetrics.density, paint)
+        }
+    }
+
+    /**
+     * The lasso's loop while it is drawn and the dashed box around what it took. An
+     * ordinary view over the page, like [Ring]: a guide, kept out of the front buffer.
+     * Also places [actions] over the box.
+     */
+    private inner class Marks : View(context) {
+        private val d = resources.displayMetrics.density
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2f * d
+            color = Ui.ACCENT
+            pathEffect = DashPathEffect(floatArrayOf(8f * d, 6f * d), 0f)
+        }
+        private val r = RectF()
+        private var shown = false
+
+        fun update() {
+            val now = looping || picked != null
+            if (now || shown) invalidate()
+            shown = now
+            place()
+        }
+
+        private fun place() {
+            val visible = picked != null && lift == null && !looping && screenBox(r)
+            if (!visible) {
+                if (actions.visibility != GONE) actions.visibility = GONE
+                return
+            }
+            if (actions.measuredWidth == 0) actions.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED)
+            val w = actions.measuredWidth
+            val h = actions.measuredHeight
+            val gap = 18f * d
+            // Above the box; below it when there is no room; always on screen.
+            val above = r.top - h - gap
+            val y = if (above >= gap) above else minOf(r.bottom + gap, this@PageView.height - h - gap)
+            actions.translationX = (r.centerX() - w / 2f).coerceIn(gap, maxOf(gap, this@PageView.width - w - gap))
+            actions.translationY = y.coerceAtLeast(0f)
+            if (actions.visibility != VISIBLE) actions.visibility = VISIBLE
+        }
+
+        override fun onDraw(canvas: Canvas) {
+            // The light blue is lost on light paper: the deep one there.
+            paint.color = if (darkPaper) Ui.ACCENT else Ui.ACCENT_DEEP
+            if (looping) canvas.drawPath(loopPath, paint)
+            if (screenBox(r)) canvas.drawRoundRect(r, 6f * d, 6f * d, paint)
         }
     }
 
@@ -859,6 +1161,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         const val MARGIN = 8f
         /** How far past the last page to pull for a new one, dp. */
         const val PULL = 96f
+        /** Points of room between what the lasso took and its box. */
+        const val BOX_PAD = 8f
+        /** dp around the box that still count as on it, for a finger. */
+        const val HIT = 12f
         /** dp the eraser reaches around the pen tip. */
         const val RUB = 10f
         /** Holding the pen this long, this still (dp), at the end of a stroke tidies it. */

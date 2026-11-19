@@ -70,11 +70,8 @@ class LassoDesignTest {
         activity.page.color = Render.ink(true)
         Replay.into(activity.page, Replay.load("synthetic.csv"), scale = 0.62f, dx = 10f, dy = 150f)
         hideUpdate(activity.window.decorView)
-        // The bar as proposed: the lasso after the eraser, in use.
-        val bar = activity.bar
-        bar.removeViewAt(3)
-        bar.addView(Ui.tool(activity, "pen") {}, 3)
-        bar.addView(Ui.tool(activity, "lasso", on = true) {}, 6)
+        // The lasso after the eraser, in use.
+        activity.bar.getChildAt(6).performClick()
         return Screen(activity)
     }
 
