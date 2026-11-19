@@ -30,7 +30,7 @@ import kotlin.concurrent.thread
  */
 class WriteActivity : Activity() {
     /** The pen's first colour is the paper's plain ink; the rest read on both papers. */
-    private val colors get() = if (page.tool == Tool.HIGHLIGHTER) Render.HIGHLIGHTS
+    private val colors get() = if (page.tool == Tool.HIGHLIGHTER && !page.lassoing) Render.HIGHLIGHTS
         else listOf(Render.ink(page.darkPaper), Ui.ACCENT_DEEP, Ui.RED, Ui.GREEN_DEEP, Ui.ORANGE)
     private val prefs by lazy { getSharedPreferences("cuaderno", MODE_PRIVATE) }
     /**
@@ -91,6 +91,7 @@ class WriteActivity : Activity() {
         }
         pages = PagesPanel(this, page, { document }, { changed() }) { trashPage(it) }
         page.onPageShown = { pages.markCurrent(it) }
+        page.onSelect = { renderBar() }
         page.onAddPage = { document.addPage(); changed() }
         recorder = Recorder(this)
         recorder.addView(page, FrameLayout.LayoutParams(-1, -1))
@@ -222,11 +223,18 @@ class WriteActivity : Activity() {
         })
         bar.addView(space(10f))
         for (option in colors) {
-            val current = Render.shown(page.color, page.darkPaper) == option
-            bar.addView(Ui.swatch(this, option, 22f, !page.erasing && !page.lassoing && current) {
-                page.color = option
-                page.erasing = false
-                page.lassoing = false
+            // With the lasso, the ring is on the colour of what it took.
+            val current = if (page.lassoing) page.selectionColor?.let { Render.shown(it, page.darkPaper) == option } == true
+                else !page.erasing && Render.shown(page.color, page.darkPaper) == option
+            bar.addView(Ui.swatch(this, option, 22f, current) {
+                // A colour with something taken recolours it; otherwise it is the pen's next colour.
+                if (!(page.lassoing && page.recolor(option))) {
+                    // The lasso shows the pen's colours: one of them goes back to the pen.
+                    if (page.lassoing) use(Tool.PEN)
+                    page.color = option
+                    page.erasing = false
+                    page.lassoing = false
+                }
                 renderBar()
             })
         }

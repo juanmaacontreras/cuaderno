@@ -55,11 +55,38 @@ class Document(notebook: Notebook, private val paper: Paper = Paper.GRID) {
      * names them afterwards. One undo step.
      */
     fun move(page: Int, which: Collection<Int>, dx: Float, dy: Float) {
+        if (dx == 0f && dy == 0f) return
+        edit(page, which) { it.moved(dx, dy) }
+    }
+
+    /** Makes the strokes of [page] at [which] [k] times as big around [ax], [ay]. Like [move]. */
+    fun scale(page: Int, which: Collection<Int>, ax: Float, ay: Float, k: Float) {
+        if (k == 1f) return
+        edit(page, which) { it.scaled(ax, ay, k) }
+    }
+
+    /** Gives the strokes of [page] at [which] [color]. Like [move]. */
+    fun recolor(page: Int, which: Collection<Int>, color: Int) {
         val at = pages.getOrNull(page) ?: return
-        if (which.isEmpty() || (dx == 0f && dy == 0f)) return
+        if (which.all { at.strokes.getOrNull(it)?.color ?: color == color }) return
+        edit(page, which) { if (it.color == color) it else it.recolored(color) }
+    }
+
+    /** Puts [strokes] on [page], on top of what is there. One undo step. Returns their indices. */
+    fun paste(page: Int, strokes: List<Stroke>): List<Int> {
+        val at = pages.getOrNull(page) ?: return emptyList()
+        if (strokes.isEmpty()) return emptyList()
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(p.strokes + strokes) else p }, merge = false)
+        return (at.strokes.size until at.strokes.size + strokes.size).toList()
+    }
+
+    /** Each stroke of [page] at [which] replaced by [f] of it, in its place. One undo step. */
+    private fun edit(page: Int, which: Collection<Int>, f: (Stroke) -> Stroke) {
+        val at = pages.getOrNull(page) ?: return
+        if (which.isEmpty()) return
         val set = which.toHashSet()
-        val moved = at.strokes.mapIndexed { i, s -> if (i in set) s.moved(dx, dy) else s }
-        change(pages.mapIndexed { i, p -> if (i == page) p.with(moved) else p }, merge = false)
+        val edited = at.strokes.mapIndexed { i, s -> if (i in set) f(s) else s }
+        change(pages.mapIndexed { i, p -> if (i == page) p.with(edited) else p }, merge = false)
     }
 
     /** Takes the strokes of [page] at [which] (indices) away. One undo step. */

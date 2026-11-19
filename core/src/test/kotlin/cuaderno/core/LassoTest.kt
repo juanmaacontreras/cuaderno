@@ -75,3 +75,54 @@ class LassoTest {
         assertEquals("nothing taken or moved is no change", before, doc.revision)
     }
 }
+
+/** Slice 2: bigger or smaller, another colour, copy and paste. */
+class LassoEditTest {
+    private fun line(x0: Float, y0: Float, x1: Float, y1: Float, tool: Tool = Tool.PEN, color: Int = -1): Stroke {
+        val b = StrokeBuilder(tool, color, 2f)
+        for (i in 0..4) b.add(x0 + (x1 - x0) * i / 4, y0 + (y1 - y0) * i / 4, 0.4f, i * 5f, 0.3f, 0.9f)
+        return b.build()
+    }
+
+    private fun doc(vararg strokes: Stroke) = Document(Notebook("n", "t", "c", "m", emptyList())).apply {
+        for (s in strokes) add(0, s)
+    }
+
+    @Test fun scalingGrowsAroundTheAnchorWidthToo() {
+        val doc = doc(line(10f, 10f, 30f, 10f), line(100f, 100f, 200f, 100f))
+        doc.scale(0, listOf(0), 10f, 10f, 2f)
+        val s = doc.pages[0].strokes[0]
+        assertEquals(10f, s.x(0), 0.001f); assertEquals(50f, s.x(4), 0.001f); assertEquals(10f, s.y(4), 0.001f)
+        assertEquals(4f, s.width, 0.001f)
+        assertEquals("the pen's record stays", 0.3f, s.tilt(2), 0.001f)
+        assertEquals(100f, doc.pages[0].strokes[1].x(0), 0.001f)
+        doc.undo()
+        assertEquals(30f, doc.pages[0].strokes[0].x(4), 0.001f)
+    }
+
+    @Test fun recolouringIsOneUndoAndNothingWhenTheColourIsTheSame() {
+        val doc = doc(line(0f, 0f, 10f, 0f, color = 1), line(0f, 5f, 10f, 5f, color = 2))
+        doc.recolor(0, listOf(0, 1), 2)
+        assertEquals(listOf(2, 2), doc.pages[0].strokes.map { it.color })
+        val r = doc.revision
+        doc.recolor(0, listOf(0, 1), 2)
+        assertEquals(r, doc.revision)
+        doc.undo()
+        assertEquals(listOf(1, 2), doc.pages[0].strokes.map { it.color })
+    }
+
+    @Test fun aClipKeepsTheShapeAndPastesAnywhereOnTop() {
+        val a = line(100f, 200f, 140f, 200f); val b = line(100f, 220f, 100f, 260f)
+        val clip = Clip.of(listOf(a, b))!!
+        assertEquals(42f, clip.width, 0.001f); assertEquals(62f, clip.height, 0.001f)
+        val doc = doc(line(0f, 0f, 5f, 0f))
+        val at = doc.paste(0, clip.at(10f, 20f))
+        assertEquals(listOf(1, 2), at)
+        val pasted = doc.pages[0].strokes[1]
+        assertEquals("box corner at 10, 20; the line starts its half-width in", 11f, pasted.x(0), 0.001f)
+        assertEquals(21f, pasted.y(0), 0.001f)
+        doc.undo()
+        assertEquals(1, doc.pages[0].strokes.size)
+        assertEquals(null, Clip.of(emptyList()))
+    }
+}

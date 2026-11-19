@@ -6,7 +6,7 @@ Updated: 2026-11-19. Read with `CLAUDE.md` at the start of a session; update at 
 
 **Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
 built: library, pages panel, pulling for a new page, trash; waiting for his week of classes
-with it. Phase 3 (lasso) approved and being built in slices: take, move and delete done (v26).**
+with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27).**
 
 The app opens on the last notebook; the bar's top button goes to the library (subjects down
 the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
@@ -24,6 +24,12 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Lasso size, colour, copy, cut, paste (v27, phase 3 slice 2): tested (core `LassoEditTest`:
+  scale around a corner with the width, recolour, clip and paste, one undo each; app
+  `LassoViewTest`: a corner doubles it around the opposite one, never off the sheet or to
+  nothing, recolour, copy then paste on another page taken, cut then paste, "Pegar" only with
+  the lasso), three checks seen failing with the code broken on purpose. Emulator: corner
+  resize, red, the bar ringing it, copy, scroll, paste in view. Not on the tablet.
 - Lasso, take, move, delete (v26, phase 3 slice 1): tested (core `LassoTest`: mostly inside,
   grazing, closing, dots, bounds, move keeps order and samples, one undo each; app `LassoViewTest`:
   loop takes, pen drag, seen while dragged, finger drag vs. finger scroll, palm put back,
@@ -80,9 +86,8 @@ points, shared by screen and PDF), `Store`,
 
 ## Next
 
-0. **Phase 3 approved (2026-11-19), in three slices.** Done: lasso, move, delete (v26).
-   Next: corner handles to resize, recolour with a colour in the bar, copy, cut and paste
-   ("Pegar" on any page or notebook). Then pictures (needs format 2). Juanma is away: he tries
+0. **Phase 3 approved (2026-11-19), in three slices.** Done: lasso, move, delete (v26); size,
+   colour, copy, cut, paste (v27). Next: pictures (needs format 2: read `format.md` first). Juanma is away: he tries
    v24..v26+ together when back, then the week of classes.
    **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
    (v20), the pages panel (v21), the paper redrawn at once (v22), pages added by pulling (v23),

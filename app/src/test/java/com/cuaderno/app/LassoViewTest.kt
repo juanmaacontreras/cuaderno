@@ -6,12 +6,15 @@ import android.graphics.Color
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
+import com.cuaderno.app.page.Clipboard
 import com.cuaderno.app.page.PageView
+import com.juanma.kit.Ui
 import cuaderno.core.Document
 import cuaderno.core.Notebook
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -73,6 +76,32 @@ class LassoViewTest {
     }
 
     private fun strokes(view: PageView) = view.document!!.pages[0].strokes
+
+    @Before fun nothingCopied() { Clipboard.clip = null }
+
+    /** Tapped as a finger would: through the page, which must let the tap reach [target]. */
+    private fun tap(view: PageView, target: View) {
+        view.measure(View.MeasureSpec.makeMeasureSpec(1206, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY))
+        view.layout(0, 0, 1206, 800)
+        // [target] may sit inside a row: where it is on the page.
+        var x = target.width / 2f
+        var y = target.height / 2f
+        var v: View = target
+        while (v !== view) {
+            x += v.x; y += v.y
+            v = v.parent as View
+        }
+        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
+            val now = SystemClock.uptimeMillis()
+            val event = MotionEvent.obtain(now, now, action, x, y, 0)
+            view.dispatchTouchEvent(event)
+            event.recycle()
+        }
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    }
+
+    private fun item(view: PageView, n: Int) = (view.actions as android.view.ViewGroup).getChildAt(n)
 
     @Test fun aLoopTakesWhatIsInsideAndOffersToDeleteIt() {
         val view = written()
@@ -157,19 +186,7 @@ class LassoViewTest {
         val view = written()
         loop(view, 80f, 80f, 340f, 440f)
         assertEquals(listOf(0, 1), view.selection)
-        // Tapped as a finger would: through the page, which must let the tap reach it.
-        view.measure(View.MeasureSpec.makeMeasureSpec(1206, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY))
-        view.layout(0, 0, 1206, 800)
-        val x = view.actions.x + view.actions.width / 2f
-        val y = view.actions.y + view.actions.height / 2f
-        for (action in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_UP)) {
-            val now = SystemClock.uptimeMillis()
-            val event = MotionEvent.obtain(now, now, action, x, y, 0)
-            view.dispatchTouchEvent(event)
-            event.recycle()
-        }
-        android.os.Looper.getMainLooper().let { org.robolectric.Shadows.shadowOf(it).idle() }
+        tap(view, (view.actions as android.view.ViewGroup).getChildAt(2))   // "Borrar"
         assertEquals(0, strokes(view).size)
         assertEquals(View.GONE, view.actions.visibility)
         view.document!!.undo()
@@ -197,5 +214,91 @@ class LassoViewTest {
         view.document = view.document              // what undo and redo do from the bar
         assertEquals(emptyList<Int>(), view.selection)
         assertFalse(view.deselect())
+    }
+
+    // --- slice 2: corners, colour, copy, cut, paste ------------------------------------
+
+    @Test fun aCornerMakesItBiggerAroundTheOppositeOneAsOneUndo() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        // The line is page 50..150 at 50, 1.1 wide: its box (8 points of room) ends at 158.55, 58.55,
+        // so the bottom-right handle is at 8 + 2 * that.
+        view.penDown(325.1f, 125.1f)
+        view.penMove(425.1f, 125.1f)
+        view.penMove(527.3f, 125.1f)                   // 101.1 points right: about twice as wide
+        assertEquals("nothing changes until it is let go", 150f, strokes(view)[0].x(10), 0.01f)
+        view.penUp()
+        val s = strokes(view)[0]
+        assertEquals("the held corner (its edge, width counted) stays", 49.45f, s.bounds[0] - s.width / 2, 0.01f)
+        assertEquals(250.5f, s.x(10), 0.1f)
+        assertEquals(2.2f, s.width, 0.01f)
+        assertEquals(listOf(0), view.selection)
+        view.document!!.undo()
+        assertEquals(150f, strokes(view)[0].x(10), 0.01f)
+    }
+
+    @Test fun aCornerCannotTakeItOffTheSheetOrToNothing() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        view.penDown(325.1f, 125.1f)
+        view.penMove(5000f, 125.1f)
+        view.penUp()
+        assertTrue("its right edge at most the sheet's", strokes(view)[0].bounds[2] + strokes(view)[0].width / 2 <= 595.01f)
+        view.document!!.undo()
+        view.penDown(325.1f, 125.1f)
+        view.penMove(-5000f, 125.1f)
+        view.penUp()
+        val s = strokes(view)[0]
+        assertTrue("still a few points wide", s.bounds[2] - s.bounds[0] + s.width >= 3.99f)
+    }
+
+    @Test fun aColourRecoloursWhatWasTakenAsOneUndo() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        val before = strokes(view)[0].color
+        assertEquals(before, view.selectionColor)
+        assertTrue(view.recolor(Ui.RED))
+        assertEquals(Ui.RED, strokes(view)[0].color)
+        assertEquals("the other one keeps its colour", before, strokes(view)[1].color)
+        assertEquals(Ui.RED, view.selectionColor)
+        view.document!!.undo()
+        assertEquals(before, strokes(view)[0].color)
+        view.deselect()
+        assertFalse("nothing taken, nothing recoloured", view.recolor(Ui.RED))
+    }
+
+    @Test fun copyThenPasteOnAnotherPageTakesThePastedOnes() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        assertEquals(View.GONE, view.pasteChip.visibility)
+        tap(view, item(view, 0))                        // "Copiar"
+        assertEquals(View.VISIBLE, view.pasteChip.visibility)
+        assertEquals("copying leaves it", 2, strokes(view).size)
+        view.document!!.addPage()
+        view.document = view.document
+        view.showPage(1)
+        tap(view, view.pasteChip)
+        val pasted = view.document!!.pages[1].strokes
+        assertEquals(1, pasted.size)
+        assertEquals("the same line", 100f, pasted[0].x(10) - pasted[0].x(0), 0.01f)
+        assertEquals(1, view.selectedPage)
+        assertEquals(listOf(0), view.selection)
+        assertEquals("used: it goes", View.GONE, view.pasteChip.visibility)
+        view.document!!.undo()
+        assertEquals(0, view.document!!.pages[1].strokes.size)
+    }
+
+    @Test fun cutTakesItAwayAndKeepsItToPaste() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        tap(view, item(view, 1))                        // "Cortar"
+        assertEquals(1, strokes(view).size)
+        assertEquals(View.VISIBLE, view.pasteChip.visibility)
+        view.lassoing = false
+        assertEquals("only with the lasso in hand", View.GONE, view.pasteChip.visibility)
+        view.lassoing = true
+        assertEquals(View.VISIBLE, view.pasteChip.visibility)
+        tap(view, view.pasteChip)
+        assertEquals(2, strokes(view).size)
     }
 }
