@@ -196,7 +196,7 @@ class WriteActivity : Activity() {
         })
         bar.addView(space(10f))
         for ((tool, icon) in listOf(Tool.PEN to "pen", Tool.HIGHLIGHTER to "highlighter")) {
-            val inUse = !page.erasing && page.tool == tool
+            val inUse = !page.erasing && !page.lassoing && page.tool == tool
             bar.addView(Ui.tool(this, icon, on = inUse) {
                 if (inUse) {
                     // Tapping the tool in use opens its widths, as in Samsung Notes.
@@ -210,15 +210,23 @@ class WriteActivity : Activity() {
         }
         bar.addView(Ui.tool(this, "eraser", on = page.erasing) {
             page.erasing = true
+            page.lassoing = false
+            widthPanel.visibility = View.GONE
+            renderBar()
+        })
+        bar.addView(Ui.tool(this, "lasso", on = page.lassoing) {
+            page.lassoing = true
+            page.erasing = false
             widthPanel.visibility = View.GONE
             renderBar()
         })
         bar.addView(space(10f))
         for (option in colors) {
             val current = Render.shown(page.color, page.darkPaper) == option
-            bar.addView(Ui.swatch(this, option, 22f, !page.erasing && current) {
+            bar.addView(Ui.swatch(this, option, 22f, !page.erasing && !page.lassoing && current) {
                 page.color = option
                 page.erasing = false
+                page.lassoing = false
                 renderBar()
             })
         }
@@ -244,6 +252,7 @@ class WriteActivity : Activity() {
     /** Switches the stylus to [tool] with the colour and width it had last time. */
     private fun use(tool: Tool) {
         page.erasing = false
+        page.lassoing = false
         if (page.tool == tool) return
         chosen[page.tool] = Pair(page.color, page.widthPt)
         page.tool = tool
@@ -281,6 +290,8 @@ class WriteActivity : Activity() {
         if (pages.open) {
             pages.close()
             renderBar()
+        } else if (page.deselect()) {
+            // Back lets go of what the lasso took before it leaves the notebook.
         } else {
             @Suppress("DEPRECATION") super.onBackPressed()
         }

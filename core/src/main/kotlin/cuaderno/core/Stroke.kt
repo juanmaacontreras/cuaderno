@@ -40,6 +40,16 @@ class Stroke(val tool: Tool, val color: Int, val width: Float, private val data:
 
     internal fun channel(i: Int, channel: Int) = data[i * STRIDE + channel]
 
+    /** The same stroke [dx], [dy] points away; everything the pen reported stays. */
+    fun moved(dx: Float, dy: Float): Stroke {
+        val copy = data.copyOf()
+        for (i in 0 until size) {
+            copy[i * STRIDE] += dx
+            copy[i * STRIDE + 1] += dy
+        }
+        return Stroke(tool, color, width, copy)
+    }
+
     /** left, top, right, bottom of the samples (not counting the stroke's width). */
     val bounds: FloatArray by lazy {
         var l = Float.MAX_VALUE; var t = Float.MAX_VALUE
