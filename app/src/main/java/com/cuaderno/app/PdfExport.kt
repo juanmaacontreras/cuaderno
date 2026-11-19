@@ -16,13 +16,17 @@ object PdfExport {
 
     /**
      * Writes the pages that have something on them (ink, a picture, a PDF page), on the paper
-     * being used; false if there are none. An imported PDF goes out as a picture of each page
-     * at 216 dpi, under the ink: its text is no longer text.
+     * being used; false if there are none. A notebook with an imported PDF goes out through
+     * [PdfWithInk]: the PDF as it came, the ink on top as vectors, on light paper.
      */
-    fun write(pages: List<Page>, out: File, dark: Boolean = false): Boolean {
+    fun write(context: android.content.Context, pages: List<Page>, out: File, dark: Boolean = false): Boolean {
         val written = taken(pages)
         if (written.isEmpty()) return false
-        val render = Render().also { it.dark = dark; it.pdfs.minScale = 3f }
+        if (written.any { it.pdf != null }) {
+            PdfWithInk.write(context, written, out)
+            return true
+        }
+        val render = Render().also { it.dark = dark }
         val pdf = PdfDocument()
         try {
             for ((i, page) in written.withIndex()) {

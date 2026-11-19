@@ -5,6 +5,18 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-19
 
+- **Export keeps the PDF as it came (phase 4, slice 2)** (origen: the plan, "probar
+  PdfBox-Android"; details Claude's). A notebook with an imported PDF goes out through PdfBox
+  (Apache 2.0, the Android port, `PdfWithInk.kt`): each PDF page is copied as it was, so its
+  text stays text (searchable, sharp at any zoom, small), and what was written on it is added
+  on top as vectors, the same paths as on screen (round, constant width, the highlighter
+  see-through under the ink, pictures under both); the notebook's own pages go in between, as
+  vectors on the light paper. Turned pages (`/Rotate`) and crop boxes are followed. Always on
+  light paper: a PDF is white. A PDF locked against changes still opens (its user password is
+  empty) and goes out unlocked. Notebooks without a PDF export as before (Android's
+  PdfDocument), untouched. Cost: the APK goes from 8.5 to 18 MB, with BouncyCastle left out
+  (14 MB more; it only serves PDFs locked with certificates). Shrinking the release build
+  (R8) would cut it, with its own risk: not now.
 - **Phase 4 approved; first slice: import a PDF and write on it (format 3)** (origen: Juanma,
   "Sí, mandale", for the four proposals; the details are Claude's). "Importar PDF" beside
   "Cuaderno nuevo" opens Android's file picker (no permission); the PDF becomes a notebook
