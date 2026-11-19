@@ -74,6 +74,8 @@ object Strings {
     const val COPY = "Copiar"
     const val CUT = "Cortar"
     const val PASTE = "Pegar"
+    const val INSERT_PICTURE = "Insertar imagen"
+    const val PICTURE_FAILED = "No se pudo abrir la imagen"
     const val TRASHED_NOTEBOOK = "El cuaderno está en la papelera"
     const val TRASHED_PAGE = "La página está en la papelera"
     const val TRASH_FAILED = "No se pudo mandar a la papelera"

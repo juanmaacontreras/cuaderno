@@ -143,7 +143,8 @@ class Tiles(private val render: Render) {
         val old = before.strokes
         val now = page.strokes
         // The usual case: pen strokes added at the end, drawn last anyway. Paint them on.
-        if (now.size > old.size && (old.size until now.size).all { now[it].tool == Tool.PEN } && prefix(old, now)) {
+        if (before.pictures === page.pictures && now.size > old.size &&
+            (old.size until now.size).all { now[it].tool == Tool.PEN } && prefix(old, now)) {
             for (k in old.size until now.size) paintOn(page, now[k], top)
             return
         }
@@ -155,6 +156,15 @@ class Tiles(private val render: Render) {
         val area = RectF()
         for (stroke in old) if (!has.containsKey(stroke)) grow(area, stroke, top)
         for (stroke in now) if (!had.containsKey(stroke)) grow(area, stroke, top)
+        // Pictures that came, went or moved: where they were and where they are.
+        if (before.pictures !== page.pictures) {
+            val kept = IdentityHashMap<Any, Boolean>()
+            for (p in page.pictures) kept[p] = true
+            val was = IdentityHashMap<Any, Boolean>()
+            for (p in before.pictures) was[p] = true
+            for (p in before.pictures) if (!kept.containsKey(p)) grow(area, p, top)
+            for (p in page.pictures) if (!was.containsKey(p)) grow(area, p, top)
+        }
         if (!area.isEmpty) stale(area)
     }
 
@@ -167,6 +177,11 @@ class Tiles(private val render: Render) {
         val b = stroke.bounds
         val w = stroke.width
         val r = RectF(b[0] - w, top + b[1] - w, b[2] + w, top + b[3] + w)
+        if (area.isEmpty) area.set(r) else area.union(r)
+    }
+
+    private fun grow(area: RectF, p: cuaderno.core.Picture, top: Float) {
+        val r = RectF(p.x - 1, top + p.y - 1, p.x + p.width + 1, top + p.y + p.height + 1)
         if (area.isEmpty) area.set(r) else area.union(r)
     }
 

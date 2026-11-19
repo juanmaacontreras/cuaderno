@@ -31,6 +31,8 @@ import cuaderno.core.Clip
 import cuaderno.core.Document
 import cuaderno.core.Lasso
 import cuaderno.core.Page
+import cuaderno.core.Picture
+import cuaderno.core.Selection
 import cuaderno.core.Shapes
 import cuaderno.core.Stroke
 import cuaderno.core.StrokeBuilder
@@ -105,10 +107,12 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     var onSelect: (() -> Unit)? = null
 
     /** Strokes the lasso took: their page and their indices in it. */
-    private class Picked(val page: Int, val which: List<Int>)
+    private class Picked(val page: Int, val which: Selection)
     private var picked: Picked? = null
     /** The indices the lasso took on [selectedPage], for the tests. */
-    val selection: List<Int> get() = picked?.which ?: emptyList()
+    val selection: List<Int> get() = picked?.which?.strokes ?: emptyList()
+    /** The indices of the pictures the lasso took on [selectedPage], for the tests. */
+    val selectedPictures: List<Int> get() = picked?.which?.pictures ?: emptyList()
     val selectedPage: Int get() = picked?.page ?: -1
 
     /** The loop being drawn: page points of [strokePage], and the same on screen. */
@@ -122,7 +126,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
      * pen or finger, over the notebook without them ([pages], the same list every frame,
      * so the kept pictures are drawn again once and not on every move).
      */
-    private class Lift(val page: Int, val top: Float, val strokes: List<Stroke>, val pages: List<Page>,
+    private class Lift(val page: Int, val top: Float, val strokes: List<Stroke>, val pictures: List<Picture>, val pages: List<Page>,
                        val minX: Float, val maxX: Float, val minY: Float, val maxY: Float,
                        /** Resizing: the content's corner held, the one pulled (page points), the limits. */
                        val corner: Int, val ax: Float, val ay: Float, val cx: Float, val cy: Float,
@@ -600,8 +604,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** The loop is closed: take what is mostly inside it on its page. */
     private fun take() {
         val page = document?.pages?.getOrNull(strokePage)
-        val which = if (page == null) emptyList() else Lasso.select(page.strokes, loop.copyOf(loopSize))
-        picked = if (which.isEmpty()) null else Picked(strokePage, which)
+        val closed = loop.copyOf(loopSize)
+        val which = if (page == null) Selection(emptyList())
+            else Selection(Lasso.select(page.strokes, closed), Lasso.selectPictures(page.pictures, closed))
+        picked = if (which.isEmpty) null else Picked(strokePage, which)
         marks.update()
         onSelect?.invoke()
     }
@@ -623,7 +629,14 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     private fun taken(): List<Stroke> {
         val p = picked ?: return emptyList()
         val strokes = document?.pages?.getOrNull(p.page)?.strokes ?: return emptyList()
-        return p.which.mapNotNull { strokes.getOrNull(it) }
+        return p.which.strokes.mapNotNull { strokes.getOrNull(it) }
+    }
+
+    /** The pictures taken, as they are on the page. */
+    private fun takenPictures(): List<Picture> {
+        val p = picked ?: return emptyList()
+        val pictures = document?.pages?.getOrNull(p.page)?.pictures ?: return emptyList()
+        return p.which.pictures.mapNotNull { pictures.getOrNull(it) }
     }
 
     /** The colour of what was taken, if its ink is all one colour (the highlighter when there is no ink). */
@@ -641,18 +654,19 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     fun recolor(color: Int): Boolean {
         val p = picked ?: return false
         val strokes = document?.pages?.getOrNull(p.page)?.strokes ?: return false
-        val inkOnly = p.which.filter { strokes.getOrNull(it)?.tool == Tool.PEN }
-        document?.recolor(p.page, inkOnly.ifEmpty { p.which }, color)
+        val inkOnly = p.which.strokes.filter { strokes.getOrNull(it)?.tool == Tool.PEN }
+        document?.recolor(p.page, inkOnly.ifEmpty { p.which.strokes }, color)
         redraw()
         onChange?.invoke()
         onSelect?.invoke()
         return true
     }
 
-    /** The content's bounds (strokes and their width), page points, before any drag. */
+    /** The content's bounds (strokes and their width, pictures), page points, before any drag. */
     private fun content(): FloatArray? {
         val strokes = taken()
-        return if (strokes.isEmpty()) null else Lasso.bounds(strokes)
+        val pictures = takenPictures()
+        return if (strokes.isEmpty() && pictures.isEmpty()) null else Lasso.bounds(strokes, pictures)
     }
 
     /** The box on screen, following a drag or a resize. */
@@ -705,8 +719,11 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val page = pages.getOrNull(p.page) ?: return
         val c = content() ?: return
         val pad = BOX_PAD
-        val set = p.which.toHashSet()
-        val without = pages.mapIndexed { i, pg -> if (i == p.page) pg.with(pg.strokes.filterIndexed { k, _ -> k !in set }) else pg }
+        val set = p.which.strokes.toHashSet()
+        val pics = p.which.pictures.toHashSet()
+        val without = pages.mapIndexed { i, pg ->
+            if (i == p.page) pg.with(pg.strokes.filterIndexed { k, _ -> k !in set }, pg.pictures.filterIndexed { k, _ -> k !in pics }) else pg
+        }
         dragFromX = x; dragFromY = y
         liftX = 0f; liftY = 0f; liftK = 1f
         // The pulled corner and the opposite one, held.
@@ -721,7 +738,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             if (w > 0f) (if (right) page.width - ax else ax) / w else Float.MAX_VALUE,
             if (h > 0f) (if (bottom) page.height - ay else ay) / h else Float.MAX_VALUE).coerceAtLeast(1f)
         // The box stays on its sheet: ink pushed off the page would be there but never seen.
-        lift = Lift(p.page, Render.top(pages, p.page), p.which.mapNotNull { page.strokes.getOrNull(it) }, without,
+        lift = Lift(p.page, Render.top(pages, p.page), taken(), takenPictures(), without,
             minOf(0f, pad - c[0]), maxOf(0f, page.width - pad - c[2]), minOf(0f, pad - c[1]), maxOf(0f, page.height - pad - c[3]),
             corner, ax, ay, cx, cy, minK, maxK)
         actions.visibility = GONE
@@ -761,8 +778,36 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         redraw()
     }
 
+    /**
+     * Puts a picture of [w] x [h] pixels in the middle of what is in view, no wider than most of
+     * the sheet, taken (with the lasso in hand) so it can be moved and sized like ink. One undo.
+     */
+    fun insertPicture(name: String, bytes: ByteArray, w: Int, h: Int) {
+        val doc = document ?: return
+        if (scale == 0f || w <= 0 || h <= 0) return
+        val pages = doc.pages
+        val n = currentPage
+        val page = pages[n]
+        val top = Render.top(pages, n)
+        val pad = BOX_PAD
+        // Most of the sheet's width, and no taller than the part of it in view.
+        val k = minOf((page.width - 2 * pad) * 0.7f / w, (height / scale) * 0.6f / h, (page.height - 2 * pad) / h)
+        val pw = w * k
+        val ph = h * k
+        val cx = (width / 2f - offsetX) / scale
+        val cy = (height / 2f - offsetY) / scale - top
+        val x = (cx - pw / 2).coerceIn(pad, maxOf(pad, page.width - pad - pw))
+        val y = (cy - ph / 2).coerceIn(pad, maxOf(pad, page.height - pad - ph))
+        val index = doc.insert(n, Picture(name, bytes, x, y, pw, ph))
+        lassoing = true
+        picked = Picked(n, Selection(emptyList(), listOf(index)))
+        redraw()
+        onChange?.invoke()
+        onSelect?.invoke()
+    }
+
     private fun copySelection() {
-        Clipboard.clip = Clip.of(taken())
+        Clipboard.clip = Clip.of(taken(), takenPictures())
         marks.update()
     }
 
@@ -783,7 +828,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val pad = BOX_PAD
         val x = (cx - clip.width / 2).coerceIn(pad, maxOf(pad, page.width - pad - clip.width))
         val y = (cy - clip.height / 2).coerceIn(pad, maxOf(pad, page.height - pad - clip.height))
-        val which = doc.paste(n, clip.at(x, y))
+        val which = doc.paste(n, clip.at(x, y), clip.picturesAt(x, y))
         Clipboard.clip = null
         picked = Picked(n, which)
         redraw()
@@ -1046,7 +1091,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 canvas.scale(k, k)
                 canvas.translate(-it.ax, -it.ay)
             }
-            // The highlighter under the ink, as on the page.
+            // Pictures under the highlighter, the highlighter under the ink, as on the page.
+            for (picture in it.pictures) brush.render.picture(canvas, picture)
             for (stroke in it.strokes) if (stroke.tool == Tool.HIGHLIGHTER) brush.render.stroke(canvas, stroke)
             for (stroke in it.strokes) if (stroke.tool != Tool.HIGHLIGHTER) brush.render.stroke(canvas, stroke)
             canvas.restore()

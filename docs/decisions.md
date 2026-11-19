@@ -5,6 +5,20 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-19
 
+- **Pictures on a page, format 2 (third slice of phase 3)** (origen: the approved design, ⋮
+  "Insertar imagen"; the details are Claude's). Android's own picker (no permission for the
+  app); the image is turned upright from its EXIF, no longer than 1600 px, JPEG 88 (a board
+  photo stays readable, a picture costs some hundred kilobytes, and every save rewrites the
+  file). It lands in the middle of the view, at most 70% of the sheet's width, taken, with the
+  lasso in hand: it moves, resizes by a corner, copies, cuts and deletes like ink, and a loop
+  takes it when its middle is inside. It sits on the paper, under all ink (to write on a photo).
+  The file: format 2 adds `pictures` to a page and the image in `attachments/`, named by its
+  content; a notebook with no picture is still written as format 1 so older apps open it
+  (`format.md`). Each picture carries its bytes in memory, so duplicating a page, the trash and
+  pasting elsewhere keep it (a test sends a page with a picture to the trash and back). Every
+  place that built a page by hand now copies it (`withId`, `withPaper`): a new field would
+  otherwise be dropped silently there. Not yet: a picture's own colour or crop; pictures in
+  the PDF come from the same drawing code as the screen, not checked on an exported file.
 - **The lasso, second slice: size, colour, copy, cut, paste** (origen: the approved design; the
   details are Claude's, to confirm on the tablet). A handle at each corner of the box: pulling
   one makes what was taken bigger or smaller with the same proportions around the opposite

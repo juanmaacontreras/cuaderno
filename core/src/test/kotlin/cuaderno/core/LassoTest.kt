@@ -126,3 +126,50 @@ class LassoEditTest {
         assertEquals(null, Clip.of(emptyList()))
     }
 }
+
+/** Slice 3: pictures go wherever ink goes, and nothing that copies a page leaves them behind. */
+class PicturesTest {
+    private val bytes = ByteArray(32) { it.toByte() }
+    private fun picture(x: Float, y: Float) = Picture(Picture.nameFor(bytes, "jpg"), bytes, x, y, 100f, 50f)
+    private fun doc() = Document(Notebook("n", "t", "c", "m", emptyList()))
+
+    @Test fun pagesThatAreCopiedOrRepaperedKeepTheirPictures() {
+        val doc = doc()
+        doc.insert(0, picture(10f, 10f))
+        doc.duplicate(0)
+        doc.paper(1, Paper.RULED)
+        assertEquals(1, doc.pages[1].pictures.size)
+        assertEquals(Paper.RULED, doc.pages[1].paper)
+        doc.addPage()
+        doc.insert(2, picture(0f, 0f))
+        assertEquals("a last page with only a picture is not blank", 3,
+            Document(doc.notebook("m")).pages.size)
+    }
+
+    @Test fun theLassoTakesAPictureByItsMiddleAndMovesScalesAndRemovesIt() {
+        val doc = doc()
+        doc.insert(0, picture(100f, 100f))           // middle at 150, 125
+        val loop = floatArrayOf(120f, 100f, 180f, 100f, 180f, 150f, 120f, 150f)
+        assertEquals(listOf(0), Lasso.selectPictures(doc.pages[0].pictures, loop))
+        assertEquals(emptyList<Int>(), Lasso.selectPictures(doc.pages[0].pictures, floatArrayOf(0f, 0f, 120f, 0f, 120f, 120f)))
+        val sel = Selection(emptyList(), listOf(0))
+        doc.move(0, sel, 10f, 20f)
+        assertEquals(110f, doc.pages[0].pictures[0].x); assertEquals(120f, doc.pages[0].pictures[0].y)
+        doc.scale(0, sel, 110f, 120f, 2f)
+        assertEquals(200f, doc.pages[0].pictures[0].width); assertEquals(110f, doc.pages[0].pictures[0].x)
+        doc.remove(0, sel)
+        assertEquals(0, doc.pages[0].pictures.size)
+        doc.undo(); doc.undo(); doc.undo()
+        assertEquals(100f, doc.pages[0].pictures[0].x)
+    }
+
+    @Test fun aClipCarriesPicturesWithTheInk() {
+        val ink = StrokeBuilder(Tool.PEN, -1, 2f).apply { add(90f, 90f, 0.5f, 0f); add(95f, 95f, 0.5f, 5f) }.build()
+        val clip = Clip.of(listOf(ink), listOf(picture(100f, 100f)))!!
+        assertEquals(111f, clip.width, 0.001f)                    // 89 (line's edge) to 200
+        val doc = doc()
+        val at = doc.paste(0, clip.at(0f, 0f), clip.picturesAt(0f, 0f))
+        assertEquals(Selection(listOf(0), listOf(0)), at)
+        assertEquals(11f, doc.pages[0].pictures[0].x, 0.001f)
+    }
+}

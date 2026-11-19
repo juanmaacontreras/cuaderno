@@ -103,12 +103,74 @@ class FormatTest {
         val newer = folder.newFile("b.cuaderno")
         java.util.zip.ZipOutputStream(newer.outputStream()).use { zip ->
             zip.putNextEntry(java.util.zip.ZipEntry("manifest.json"))
-            zip.write("""{"format":2,"id":"x","title":"x","created":"","modified":"","pages":[]}""".toByteArray())
+            zip.write("""{"format":3,"id":"x","title":"x","created":"","modified":"","pages":[]}""".toByteArray())
             zip.closeEntry()
         }
         val error = assertThrows(FormatException::class.java) { NotebookFile.read(newer) }
-        assertTrue(error.message!!.contains("format 2"))
+        assertTrue(error.message!!.contains("format 3"))
         assertThrows(FormatException::class.java) { NotebookFile.read(folder.newFile("empty.cuaderno")) }
+    }
+
+    // --- format 2: pictures ----------------------------------------------------------
+
+    private val photo = ByteArray(300) { (it * 7).toByte() }
+
+    /** The sample with a picture on its first page, the same one again on its second. */
+    private fun withPictures(): Notebook {
+        val name = Picture.nameFor(photo, "jpg")
+        val n = sample()
+        val pages = listOf(
+            n.pages[0].with(n.pages[0].strokes, listOf(Picture(name, photo, 50f, 60f, 300f, 200f))),
+            n.pages[1].with(emptyList(), listOf(Picture(name, photo, 10f, 20f, 150f, 100f))))
+        return Notebook(n.id, n.title, n.created, n.modified, pages, n.attachments)
+    }
+
+    private fun manifest(file: File) = java.util.zip.ZipFile(file).use { zip ->
+        String(zip.getInputStream(zip.getEntry("manifest.json")).readBytes())
+    }
+
+    @Test fun picturesComeBackWhereTheyWereAndTheirFileIsKeptOnce() {
+        val file = folder.newFile("p.cuaderno")
+        NotebookFile.write(file, withPictures())
+        assertTrue(manifest(file).contains("\"format\":2"))
+        val names = java.util.zip.ZipFile(file).use { zip -> zip.entries().toList().map { it.name } }
+        assertEquals("one file for the picture used twice", 1, names.count { it.startsWith("attachments/pic-") })
+        val back = NotebookFile.read(file)
+        assertSame(withPictures(), back)
+        assertEquals(withPictures().pages.map { it.pictures }, back.pages.map { it.pictures })
+        assertArrayEquals(photo, back.pages[1].pictures[0].bytes)
+        assertEquals("pictures are not listed as attachments", setOf("guia.pdf"), back.attachments.keys)
+        assertEquals("the cover keeps its picture", 1, NotebookFile.summary(file).first!!.pictures.size)
+        assertEquals("a page with only a picture is not a blank end", 2, NotebookFile.summary(file).pages)
+    }
+
+    @Test fun aNotebookWithoutPicturesIsStillFormat1() {
+        val file = folder.newFile("a.cuaderno")
+        NotebookFile.write(file, sample())
+        assertTrue("so an app before pictures still opens it", manifest(file).contains("\"format\":1"))
+    }
+
+    @Test fun aPictureWhoseFileIsMissingIsAnError() {
+        val file = folder.newFile("broken.cuaderno")
+        java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+            zip.putNextEntry(java.util.zip.ZipEntry("manifest.json"))
+            zip.write(("""{"format":2,"id":"x","title":"x","created":"","modified":"","pages":[{"id":"p1","width":595,"height":842,""" +
+                """"paper":"grid","strokes":"pages/p1.strokes","pictures":[{"file":"attachments/pic-0.jpg","x":0,"y":0,"width":1,"height":1}]}]}""").toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(java.util.zip.ZipEntry("pages/p1.strokes"))
+            zip.write(StrokeCodec.encode(emptyList()))
+            zip.closeEntry()
+        }
+        assertThrows(FormatException::class.java) { NotebookFile.read(file) }
+    }
+
+    @Test fun aVersion2NotebookStillOpens() {
+        System.getenv("CUADERNO_FIXTURE")?.let { NotebookFile.write(File(it), withPictures()) }
+        val file = folder.newFile("v2.cuaderno")
+        javaClass.getResourceAsStream("/v2.cuaderno")!!.use { input -> file.outputStream().use { input.copyTo(it) } }
+        val back = NotebookFile.read(file)
+        assertSame(withPictures(), back)
+        assertEquals(withPictures().pages.map { it.pictures }, back.pages.map { it.pictures })
     }
 
     @Test fun pageIdsCannotEscapeTheFile() {

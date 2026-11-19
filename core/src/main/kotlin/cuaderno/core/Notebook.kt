@@ -27,6 +27,31 @@ enum class Paper(val code: String) {
     }
 }
 
+/**
+ * A picture on a page (a photo of the board, a screenshot): the image file's bytes, named by
+ * their content ([nameFor]), and where it sits, in page points. Under the ink, over the paper.
+ * Immutable; the bytes are never changed once read.
+ */
+class Picture(val name: String, val bytes: ByteArray, val x: Float, val y: Float, val width: Float, val height: Float) {
+    fun moved(dx: Float, dy: Float) = Picture(name, bytes, x + dx, y + dy, width, height)
+
+    /** [k] times as big around [ax], [ay], like [Stroke.scaled]. */
+    fun scaled(ax: Float, ay: Float, k: Float) = Picture(name, bytes, ax + (x - ax) * k, ay + (y - ay) * k, width * k, height * k)
+
+    override fun equals(other: Any?) = other is Picture && name == other.name && x == other.x && y == other.y &&
+        width == other.width && height == other.height
+
+    override fun hashCode() = 31 * (31 * name.hashCode() + x.hashCode()) + y.hashCode()
+
+    companion object {
+        /** A name from the bytes themselves: the same image is one file however many times it is used. */
+        fun nameFor(bytes: ByteArray, extension: String): String {
+            val digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+            return "pic-" + digest.take(10).joinToString("") { "%02x".format(it) } + "." + extension
+        }
+    }
+}
+
 /** One page. [width] and [height] in page points (A4 is 595 x 842). */
 class Page(
     val id: String,
@@ -34,8 +59,16 @@ class Page(
     val height: Float,
     val paper: Paper,
     val strokes: List<Stroke>,
+    val pictures: List<Picture> = emptyList(),
 ) {
-    fun with(strokes: List<Stroke>) = Page(id, width, height, paper, strokes)
+    /** The same page with other strokes; everything else, pictures included, stays. */
+    fun with(strokes: List<Stroke>) = Page(id, width, height, paper, strokes, pictures)
+    fun with(strokes: List<Stroke>, pictures: List<Picture>) = Page(id, width, height, paper, strokes, pictures)
+    fun withPaper(paper: Paper) = Page(id, width, height, paper, strokes, pictures)
+    fun withId(id: String) = Page(id, width, height, paper, strokes, pictures)
+
+    /** Nothing written or placed on it. */
+    val isBlank: Boolean get() = strokes.isEmpty() && pictures.isEmpty()
 
     companion object {
         const val A4_WIDTH = 595f
@@ -46,7 +79,8 @@ class Page(
 /**
  * A notebook as it is in memory. [created] and [modified] are ISO-8601 texts
  * the caller provides, so this module needs no clock. [attachments] are the
- * files that travel inside the notebook (a background PDF, images), by name.
+ * files that travel inside the notebook (a background PDF), by name; pictures
+ * carry their own bytes ([Picture]) and are not listed here.
  */
 class Notebook(
     val id: String,
@@ -62,7 +96,8 @@ class Notebook(
  * the truth; anything else the app keeps about it is a cache.
  */
 object NotebookFile {
-    const val FORMAT = 1
+    /** The newest format this version reads and writes. A notebook without pictures is still written as 1. */
+    const val FORMAT = 2
     private val ID = Regex("[A-Za-z0-9_-]{1,64}")
     private val ATTACHMENT = Regex("[A-Za-z0-9_.-]{1,128}")
 
@@ -77,9 +112,17 @@ object NotebookFile {
             require(ID.matches(page.id) && seen.add(page.id)) { "bad or repeated page id '${page.id}'" }
         }
         for (name in notebook.attachments.keys) require(ATTACHMENT.matches(name)) { "bad attachment name '$name'" }
+        // Pictures' files go with the rest of what travels inside, once each.
+        val files = LinkedHashMap(notebook.attachments)
+        for (page in notebook.pages) for (picture in page.pictures) {
+            require(ATTACHMENT.matches(picture.name)) { "bad picture name '${picture.name}'" }
+            files.putIfAbsent(picture.name, picture.bytes)
+        }
+        // Format 1 readers know nothing of pictures: only a notebook with them needs 2.
+        val format = if (notebook.pages.any { it.pictures.isNotEmpty() }) 2 else 1
 
         val manifest = buildJsonObject {
-            put("format", FORMAT)
+            put("format", format)
             put("app", "cuaderno")
             put("id", notebook.id)
             put("title", notebook.title)
@@ -92,6 +135,13 @@ object NotebookFile {
                     put("height", page.height)
                     put("paper", page.paper.code)
                     put("strokes", "pages/${page.id}.strokes")
+                    if (page.pictures.isNotEmpty()) put("pictures", buildJsonArray {
+                        for (picture in page.pictures) add(buildJsonObject {
+                            put("file", "attachments/${picture.name}")
+                            put("x", picture.x); put("y", picture.y)
+                            put("width", picture.width); put("height", picture.height)
+                        })
+                    })
                 })
             })
         }
@@ -108,7 +158,7 @@ object NotebookFile {
                     zip.write(StrokeCodec.encode(page.strokes))
                     zip.closeEntry()
                 }
-                for ((name, bytes) in notebook.attachments) {
+                for ((name, bytes) in files) {
                     zip.putNextEntry(ZipEntry("attachments/$name"))
                     zip.write(bytes)
                     zip.closeEntry()
@@ -134,6 +184,8 @@ object NotebookFile {
                 val format = manifest.getValue("format").jsonPrimitive.int
                 // A newer file may hold things this version would drop on the next save.
                 if (format > FORMAT) throw FormatException("notebook format $format, this app reads up to $FORMAT")
+                // Read once each, shared by every picture that shows them.
+                val files = HashMap<String, ByteArray>()
                 val pages = manifest.getValue("pages").jsonArray.map { element ->
                     val page: JsonObject = element.jsonObject
                     Page(
@@ -142,11 +194,12 @@ object NotebookFile {
                         height = page.getValue("height").jsonPrimitive.float,
                         paper = Paper.of(page.text("paper")),
                         strokes = StrokeCodec.decode(bytes(page.text("strokes"))),
+                        pictures = pictures(page) { files.getOrPut(it) { bytes(it) } },
                     )
                 }
                 val attachments = LinkedHashMap<String, ByteArray>()
                 for (entry in zip.entries()) {
-                    if (!entry.isDirectory && entry.name.startsWith("attachments/")) {
+                    if (!entry.isDirectory && entry.name.startsWith("attachments/") && entry.name !in files) {
                         attachments[entry.name.removePrefix("attachments/")] = bytes(entry.name)
                     }
                 }
@@ -175,15 +228,17 @@ object NotebookFile {
                 val format = manifest.getValue("format").jsonPrimitive.int
                 if (format > FORMAT) throw FormatException("notebook format $format, this app reads up to $FORMAT")
                 val pages = manifest.getValue("pages").jsonArray
+                fun bytes(name: String): ByteArray {
+                    val e = zip.getEntry(name) ?: throw FormatException("missing '$name'")
+                    return zip.getInputStream(e).use { it.readBytes() }
+                }
                 val first = pages.firstOrNull()?.jsonObject?.let { page ->
-                    val strokes = zip.getEntry(page.text("strokes")) ?: throw FormatException("missing '${page.text("strokes")}'")
                     Page(page.text("id"), page.getValue("width").jsonPrimitive.float, page.getValue("height").jsonPrimitive.float,
-                        Paper.of(page.text("paper")), StrokeCodec.decode(zip.getInputStream(strokes).use { it.readBytes() }))
+                        Paper.of(page.text("paper")), StrokeCodec.decode(bytes(page.text("strokes"))), pictures(page) { bytes(it) })
                 }
                 // A blank last page is not opened (Document), so it is not counted.
                 val blankEnd = pages.size > 1 && pages.last().jsonObject.let { page ->
-                    val strokes = zip.getEntry(page.text("strokes")) ?: throw FormatException("missing '${page.text("strokes")}'")
-                    StrokeCodec.decode(zip.getInputStream(strokes).use { it.readBytes() }).isEmpty()
+                    StrokeCodec.decode(bytes(page.text("strokes"))).isEmpty() && page["pictures"] == null
                 }
                 return Summary(manifest.text("title"), manifest.text("modified"), pages.size - if (blankEnd) 1 else 0, first)
             }
@@ -197,4 +252,18 @@ object NotebookFile {
     class Summary(val title: String, val modified: String, val pages: Int, val first: Page?)
 
     private fun JsonObject.text(key: String) = getValue(key).jsonPrimitive.content
+
+    /** A page's pictures (format 2); none in format 1. [file] gives an entry's bytes. */
+    private fun pictures(page: JsonObject, file: (String) -> ByteArray): List<Picture> {
+        val list = page["pictures"]?.jsonArray ?: return emptyList()
+        return list.map { element ->
+            val p = element.jsonObject
+            val path = p.text("file")
+            if (!path.startsWith("attachments/") || !ATTACHMENT.matches(path.removePrefix("attachments/"))) {
+                throw FormatException("bad picture file '$path'")
+            }
+            Picture(path.removePrefix("attachments/"), file(path), p.getValue("x").jsonPrimitive.float,
+                p.getValue("y").jsonPrimitive.float, p.getValue("width").jsonPrimitive.float, p.getValue("height").jsonPrimitive.float)
+        }
+    }
 }

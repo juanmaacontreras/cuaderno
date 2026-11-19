@@ -5,15 +5,18 @@ package cuaderno.core
  * strokes with the top-left of their box (width counted) at 0, 0, so they can be put
  * anywhere. Immutable.
  */
-class Clip private constructor(val strokes: List<Stroke>, val width: Float, val height: Float) {
+class Clip private constructor(val strokes: List<Stroke>, val pictures: List<Picture>, val width: Float, val height: Float) {
     /** The strokes with the box's top-left at [x], [y]. */
     fun at(x: Float, y: Float): List<Stroke> = strokes.map { it.moved(x, y) }
 
+    /** The pictures with the box's top-left at [x], [y]. */
+    fun picturesAt(x: Float, y: Float): List<Picture> = pictures.map { it.moved(x, y) }
+
     companion object {
-        fun of(strokes: List<Stroke>): Clip? {
-            if (strokes.isEmpty()) return null
-            val b = Lasso.bounds(strokes)
-            return Clip(strokes.map { it.moved(-b[0], -b[1]) }, b[2] - b[0], b[3] - b[1])
+        fun of(strokes: List<Stroke>, pictures: List<Picture> = emptyList()): Clip? {
+            if (strokes.isEmpty() && pictures.isEmpty()) return null
+            val b = Lasso.bounds(strokes, pictures)
+            return Clip(strokes.map { it.moved(-b[0], -b[1]) }, pictures.map { it.moved(-b[0], -b[1]) }, b[2] - b[0], b[3] - b[1])
         }
     }
 }
