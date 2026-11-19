@@ -42,6 +42,8 @@ class Render {
     // Decoded once per image file and kept, like the paths: by the bytes' identity.
     private val images = java.util.IdentityHashMap<ByteArray, android.graphics.Bitmap?>()
     private val smooth = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+    /** Imported PDFs under the ink. Its [PdfPainter.minScale] is for a canvas that does not show its scale. */
+    val pdfs = PdfPainter()
     private val place = android.graphics.RectF()
 
     /**
@@ -71,7 +73,9 @@ class Render {
         rule.color = if (dark) RULE_DARK else RULE_LIGHT
         rule.strokeWidth = ruleWidth
         canvas.drawRect(0f, 0f, page.width, page.height, fill)
-        paper(canvas, page)
+        // A PDF page is the paper itself; if it cannot be read, plain paper shows and the ink is still there.
+        val pdf = page.pdf
+        if (pdf == null || !pdfs.draw(canvas, pdf, page.width, page.height, top, bottom, left, right, dark)) paper(canvas, page)
         // Pictures on the paper, under everything written.
         for (picture in page.pictures) {
             if (picture.y + picture.height < top || picture.y > bottom) continue
@@ -149,6 +153,9 @@ class Render {
         canvas.drawRect(place, rule)
         rule.style = Paint.Style.FILL
     }
+
+    /** Lets go of the PDFs it opened; it can still draw afterwards. */
+    fun close() = pdfs.close()
 
     private fun decode(bytes: ByteArray): android.graphics.Bitmap? = try {
         android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size,

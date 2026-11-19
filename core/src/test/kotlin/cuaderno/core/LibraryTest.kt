@@ -109,4 +109,16 @@ class LibraryTest {
         file.delete()
         assertNull(lib.last)
     }
+
+    @Test fun aPdfBecomesANotebookOfItsPagesInTheSubject() {
+        val library = library()
+        library.addSubject("Circuitos", 0)
+        val bytes = "%PDF-1.4 guía".toByteArray()
+        val file = library.importPdf("  Guía 3 ", "Circuitos", bytes, listOf(595f to 842f, 612f to 792f), "2026-11-19T10:00:00-03:00", "nb-guia")
+        val n = NotebookFile.read(file)
+        assertEquals("Guía 3", n.title)
+        assertEquals(listOf(0, 1), n.pages.map { it.pdf!!.index })
+        assertEquals(listOf(595f, 612f), n.pages.map { it.width })
+        assertEquals("Circuitos", library.notebooks().single().subject)
+    }
 }

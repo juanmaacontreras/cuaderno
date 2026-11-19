@@ -15,7 +15,9 @@ object Thumbnail {
      * screens would not show where the sheet ends). [part] of the page's width shows: its
      * corner, enlarged. Draws with [render], which belongs to the calling thread.
      */
-    fun draw(page: Page, width: Int, dark: Boolean, density: Float, part: Float = 1f, render: Render = Render()): Bitmap {
+    fun draw(page: Page, width: Int, dark: Boolean, density: Float, part: Float = 1f, render: Render? = null): Bitmap {
+        val own = render == null
+        val render = render ?: Render()
         val h = (width * page.height / page.width).toInt().coerceAtLeast(1)
         val image = Bitmap.createBitmap(width, h, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(image)
@@ -29,6 +31,7 @@ object Thumbnail {
         // Never under a pixel: the paper would not show at all.
         render.ruleWidth = maxOf(0.5f, 1f / s)
         render.page(canvas, page)
+        if (own) render.close()
         canvas.restore()
         val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             style = Paint.Style.STROKE

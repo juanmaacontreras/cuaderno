@@ -5,6 +5,22 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-19
 
+- **Phase 4 approved; first slice: import a PDF and write on it (format 3)** (origen: Juanma,
+  "Sí, mandale", for the four proposals; the details are Claude's). "Importar PDF" beside
+  "Cuaderno nuevo" opens Android's file picker (no permission); the PDF becomes a notebook
+  named like its file, in the subject shown, one page per PDF page at that page's size, and
+  opens. The PDF is drawn by Android's own reader (`PdfRenderer`, free, no library) only where
+  it shows and at the zoom it is shown, so text stays sharp zoomed in; it is drawn into the
+  page's tiles once and pen strokes are painted on top without drawing it again (writing on a
+  PDF costs what writing on paper does). On dark paper it is inverted with its hues kept (white
+  → the dark sheet, black → light; a red figure stays reddish), so the ink's colours work the
+  same. A PDF Android cannot read shows plain paper and keeps the ink. The file keeps the PDF
+  inside (format 3, `format.md`), stored without compression. Export takes PDF pages even with
+  nothing written, as pictures at 216 dpi under the ink (the text stops being text): keeping it
+  as text is the next slice. Robolectric has no PDF reader, so the tests use a stand-in behind
+  `PdfPainter.Reader`; the real reader was tried on the emulator. Not yet: a password-protected
+  PDF only says it could not be opened; a big PDF is copied whole on every save (fine for a
+  guide of a few MB, to measure with a real one).
 - **Phase 4 proposals as rendered images** (origen: Claude, waiting for his OK;
   `PdfDesignTest`, run by `tools/screens.sh`). 1: "Importar PDF" beside "Cuaderno nuevo"; an
   imported PDF is a notebook in the subject shown, its cover the first page, "PDF · N páginas".

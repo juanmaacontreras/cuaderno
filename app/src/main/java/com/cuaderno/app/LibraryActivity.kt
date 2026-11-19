@@ -124,6 +124,8 @@ class LibraryActivity : Activity() {
         names.addView(Ui.text(this, when (shown) { null -> Strings.ALL; Library.NO_SUBJECT -> Strings.NO_SUBJECT; else -> shown!! }, 28f, Ui.BRIGHT, bold = true))
         names.addView(Ui.text(this, Strings.notebooks(entries.size), 15f, Ui.DIM))
         head.addView(names, LinearLayout.LayoutParams(0, -2, 1f))
+        head.addView(Ui.button(this, Strings.IMPORT_PDF, filled = false) { pickPdf() },
+            LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(10f) })
         head.addView(Ui.button(this, "+  " + Strings.NEW_NOTEBOOK, filled = true) { newNotebook() })
         main.addView(head, LinearLayout.LayoutParams(-1, -2))
 
@@ -265,7 +267,8 @@ class LibraryActivity : Activity() {
         val page = entry.cover ?: Page("x", Page.A4_WIDTH, Page.A4_HEIGHT, Paper.BLANK, emptyList())
         card.addView(ImageView(this).apply { setImageBitmap(thumbnail(page, COVER.toFloat())) })
         card.addView(Ui.text(this, entry.title, 15f, Ui.BRIGHT, bold = true).apply { setPadding(0, dp(10f), 0, 0); maxLines = 2 })
-        val about = if (entry.problem != null) Strings.UNREADABLE_SHORT else Strings.pages(entry.pages) + " · " + day(entry.modified)
+        val about = if (entry.problem != null) Strings.UNREADABLE_SHORT else
+            (if (entry.cover?.pdf != null) Strings.PDF + " · " else "") + Strings.pages(entry.pages) + " · " + day(entry.modified)
         card.addView(Ui.text(this, about, 13f, if (entry.problem != null) Ui.YELLOW else Ui.DIM))
         return card
     }
@@ -285,6 +288,41 @@ class LibraryActivity : Activity() {
             else -> "${date.dayOfMonth} ${Strings.MONTHS[date.monthValue - 1]}"
         }
     } catch (e: Exception) { "" }
+
+    // --- importing a PDF ---------------------------------------------------------------
+
+    /** Android's own file picker, PDFs only: the app needs no permission to read the one he picks. */
+    fun pickPdf() {
+        val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("application/pdf")
+        try {
+            @Suppress("DEPRECATION") startActivityForResult(pick, PICK_PDF)
+        } catch (e: android.content.ActivityNotFoundException) {
+            toast(Strings.PDF_FAILED)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION") super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (requestCode != PICK_PDF || resultCode != RESULT_OK || uri == null) return
+        val subject = shown?.takeIf { it != Library.NO_SUBJECT && it != TRASH }
+        // Reading and copying a PDF takes a moment: never on the thread that draws.
+        Thread {
+            val file = try { importPdf(uri, subject) } catch (e: Exception) { null } catch (e: OutOfMemoryError) { null }
+            runOnUiThread { if (file == null) toast(Strings.PDF_FAILED) else open(file) }
+        }.start()
+    }
+
+    /** The PDF at [uri] as a new notebook in [subject], named like its file; null if Android cannot read it. */
+    fun importPdf(uri: android.net.Uri, subject: String?): File? {
+        val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        val sizes = com.cuaderno.app.page.PdfPainter.sizes(bytes) ?: return null
+        val name = contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+        val title = name?.substringBeforeLast('.')?.trim()?.takeIf { it.isNotEmpty() } ?: Strings.UNTITLED
+        return library.importPdf(title, subject, bytes, sizes, Screen.now(), "nb-" + System.currentTimeMillis())
+    }
 
     fun open(file: File) {
         library.last = file
@@ -508,6 +546,7 @@ class LibraryActivity : Activity() {
         private const val SHOWN = "library_shown"
         /** [shown] when the trash is. */
         const val TRASH = "\u0000trash"
+        private const val PICK_PDF = 8
         /** Cover width, dp. */
         private const val COVER = 168
         /** Subject colours, in the order new ones take them: Nord frost, orange, green, yellow, purple, red, blue. */

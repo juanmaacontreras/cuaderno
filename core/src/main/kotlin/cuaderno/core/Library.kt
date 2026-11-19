@@ -83,6 +83,23 @@ class Library(val root: File) {
         return file
     }
 
+    /**
+     * A notebook made of a PDF ([bytes]), one page per PDF page, each the size [sizes] gives
+     * (points, width and height), in [subject] (null for none). Reading the PDF's pages is the
+     * caller's: this module does not read PDFs.
+     */
+    fun importPdf(title: String, subject: String?, bytes: ByteArray, sizes: List<Pair<Float, Float>>, now: String, id: String): File {
+        require(sizes.isNotEmpty()) { "a PDF without pages" }
+        val dir = if (subject == null) root else File(root, subject).also { require(it.isDirectory) { "no subject '$subject'" } }
+        dir.mkdirs()
+        val file = File(dir, id + EXTENSION)
+        require(!file.exists()) { "notebook '$id' exists" }
+        val name = PdfPage.nameFor(bytes)
+        val pages = sizes.mapIndexed { i, (w, h) -> Page("p${i + 1}", w, h, Paper.BLANK, emptyList(), pdf = PdfPage(name, bytes, i)) }
+        NotebookFile.write(file, Notebook(id, title.trim(), now, now, pages))
+        return file
+    }
+
     /** Gives the notebook in [file] a new title. The whole file is written again, atomically. */
     fun rename(file: File, title: String) {
         val n = NotebookFile.read(file)
