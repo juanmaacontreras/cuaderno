@@ -40,6 +40,22 @@ class Stroke(val tool: Tool, val color: Int, val width: Float, private val data:
 
     internal fun channel(i: Int, channel: Int) = data[i * STRIDE + channel]
 
+    /**
+     * The same stroke [k] times as big around the point [ax], [ay], its width too, as a
+     * picture grows (Samsung Notes does the same). Everything else the pen reported stays.
+     */
+    fun scaled(ax: Float, ay: Float, k: Float): Stroke {
+        val copy = data.copyOf()
+        for (i in 0 until size) {
+            copy[i * STRIDE] = ax + (copy[i * STRIDE] - ax) * k
+            copy[i * STRIDE + 1] = ay + (copy[i * STRIDE + 1] - ay) * k
+        }
+        return Stroke(tool, color, width * k, copy)
+    }
+
+    /** The same stroke in another colour. */
+    fun recolored(color: Int) = Stroke(tool, color, width, data)
+
     /** The same stroke [dx], [dy] points away; everything the pen reported stays. */
     fun moved(dx: Float, dy: Float): Stroke {
         val copy = data.copyOf()

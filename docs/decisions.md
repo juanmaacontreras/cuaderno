@@ -5,6 +5,19 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-19
 
+- **The lasso, second slice: size, colour, copy, cut, paste** (origen: the approved design; the
+  details are Claude's, to confirm on the tablet). A handle at each corner of the box: pulling
+  one makes what was taken bigger or smaller with the same proportions around the opposite
+  corner, its line width too, as a picture grows (Samsung Notes does the same); never smaller
+  than 4 points nor out of the sheet. A colour in the bar with something taken recolours its ink
+  (the highlighter keeps its colour unless nothing else was taken), and the bar rings that
+  colour; with nothing taken a colour goes back to the pen, as before. While the lasso is in
+  hand the bar shows the pen's colours. "Copiar" and "Cortar" keep it in the app (not Android's
+  clipboard, which carries text) until "Pegar", an accent chip at the top while the lasso is in
+  hand, on any page or notebook; pasting puts it in the middle of what is in view, taken, and
+  "Pegar" goes (until the next copy). Each change is one undo. The clip dies with the app: it is
+  never the only copy of a note (Cortar's ink is in the undo history and the saved file until
+  it is pasted or the app closes; origen: Claude, worth a thought if he loses something this way).
 - **Phase 3 approved as designed** (origen: Juanma, "Sí, mandale", seeing `fase3-*.png` from
   away from home; he cannot try builds until he is back, so slices ship one after another and
   he tries them together). Three slices, one PR each, as proposed.

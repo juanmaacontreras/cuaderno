@@ -25,7 +25,9 @@ import androidx.graphics.surface.SurfaceControlCompat
 import java.util.concurrent.atomic.AtomicBoolean
 import androidx.graphics.lowlatency.CanvasFrontBufferedRenderer
 import com.cuaderno.app.Strings
+import com.juanma.kit.Icons
 import com.juanma.kit.Ui
+import cuaderno.core.Clip
 import cuaderno.core.Document
 import cuaderno.core.Lasso
 import cuaderno.core.Page
@@ -88,12 +90,19 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     var tool = Tool.PEN
     var erasing = false
 
-    /** The pen draws a loop; what it takes can be moved (pen or finger) or deleted. */
+    /**
+     * The pen draws a loop; what it takes can be moved (pen or finger), made bigger or smaller
+     * by a corner, recoloured ([recolor]), copied, cut, deleted, and pasted elsewhere.
+     */
     var lassoing = false
         set(value) {
             field = value
             if (!value) deselect()
+            marks.update()
         }
+
+    /** Called on the main thread when what the lasso took changes (the bar rings its colour). */
+    var onSelect: (() -> Unit)? = null
 
     /** Strokes the lasso took: their page and their indices in it. */
     private class Picked(val page: Int, val which: List<Int>)
@@ -114,10 +123,15 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
      * so the kept pictures are drawn again once and not on every move).
      */
     private class Lift(val page: Int, val top: Float, val strokes: List<Stroke>, val pages: List<Page>,
-                       val minX: Float, val maxX: Float, val minY: Float, val maxY: Float)
+                       val minX: Float, val maxX: Float, val minY: Float, val maxY: Float,
+                       /** Resizing: the content's corner held, the one pulled (page points), the limits. */
+                       val corner: Int, val ax: Float, val ay: Float, val cx: Float, val cy: Float,
+                       val minK: Float, val maxK: Float)
     @Volatile private var lift: Lift? = null
     @Volatile private var liftX = 0f
     @Volatile private var liftY = 0f
+    /** How many times as big, around the lift's held corner. */
+    @Volatile private var liftK = 1f
     private var dragFromX = 0f
     private var dragFromY = 0f
     /** The finger moving the selection, or -1 (the pen moves it through [penId]). */
@@ -233,10 +247,29 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val d = resources.displayMetrics.density
         setPadding((6 * d).toInt(), (4 * d).toInt(), (6 * d).toInt(), (4 * d).toInt())
         elevation = 8 * d
-        addView(Ui.text(context, Strings.DELETE, 15f, Ui.RED, bold = true).apply {
-            setPadding((16 * d).toInt(), (12 * d).toInt(), (16 * d).toInt(), (12 * d).toInt())
-            setOnClickListener { deleteSelection() }
-        })
+        for ((label, color, action) in listOf(
+            Triple(Strings.COPY, Ui.TEXT) { copySelection() },
+            Triple(Strings.CUT, Ui.TEXT) { copySelection(); deleteSelection() },
+            Triple(Strings.DELETE, Ui.RED) { deleteSelection() })) {
+            addView(Ui.text(context, label, 15f, color, bold = true).apply {
+                setPadding((16 * d).toInt(), (12 * d).toInt(), (16 * d).toInt(), (12 * d).toInt())
+                setOnClickListener { action() }
+            })
+        }
+        visibility = GONE
+    }
+
+    /** "Pegar", over the page while there is something copied and the lasso is in hand. */
+    val pasteChip: View = Ui.row(context).apply {
+        val d = resources.displayMetrics.density
+        background = Ui.rounded(Ui.ACCENT, 22f, context)
+        setPadding((18 * d).toInt(), (10 * d).toInt(), (22 * d).toInt(), (10 * d).toInt())
+        elevation = 8 * d
+        gravity = Gravity.CENTER_VERTICAL
+        addView(View(context).apply { background = Icons.drawable("pages", Ui.BG) },
+            android.widget.LinearLayout.LayoutParams((20 * d).toInt(), (20 * d).toInt()))
+        addView(Ui.text(context, Strings.PASTE, 16f, Ui.BG, bold = true).apply { setPadding((10 * d).toInt(), 0, 0, 0) })
+        setOnClickListener { paste() }
         visibility = GONE
     }
 
@@ -246,6 +279,9 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         addView(ring, LayoutParams(-1, -1))
         addView(marks, LayoutParams(-1, -1))
         addView(actions, LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
+        addView(pasteChip, LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
+            topMargin = (20 * resources.displayMetrics.density).toInt()
+        })
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -266,15 +302,16 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     // --- input ------------------------------------------------------------------
 
-    /** A touch that began on the selection's actions: theirs until it lifts, so the tap lands. */
+    /** A touch that began on the selection's actions or "Pegar": theirs until it lifts, so the tap lands. */
     private var onActions = false
 
-    /** Everything is the page's, except a touch that lands on the selection's actions. */
+    private fun over(view: View, event: MotionEvent) = view.visibility == VISIBLE &&
+        event.x >= view.x && event.x <= view.x + view.width && event.y >= view.y && event.y <= view.y + view.height
+
+    /** Everything is the page's, except a touch that lands on the selection's actions or "Pegar". */
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            onActions = actions.visibility == VISIBLE && penId == -1 &&
-                event.x >= actions.x && event.x <= actions.x + actions.width &&
-                event.y >= actions.y && event.y <= actions.y + actions.height
+            onActions = penId == -1 && (over(actions, event) || over(pasteChip, event))
         }
         return !onActions
     }
@@ -315,10 +352,11 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                 } else {
                     // A finger that lands while the pen writes is the hand: ignored until it lifts.
                     if (penId != -1) ignored.add(event.getPointerId(index))
-                    if (event.actionMasked == MotionEvent.ACTION_DOWN && penId == -1 && onSelection(event.x, event.y)) {
-                        // One finger on what the lasso took moves it.
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN && penId == -1 &&
+                        (handleAt(event.x, event.y) >= 0 || onSelection(event.x, event.y))) {
+                        // One finger on what the lasso took moves it, or by a corner resizes it.
                         dragFinger = event.getPointerId(index)
-                        startDrag(event.x, event.y)
+                        startDrag(event.x, event.y, handleAt(event.x, event.y))
                         return true
                     }
                     if (dragFinger != -1) {
@@ -420,8 +458,9 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             return
         }
         if (lassoing) {
-            if (onSelection(x, y)) {
-                startDrag(x, y)
+            val corner = handleAt(x, y)
+            if (corner >= 0 || onSelection(x, y)) {
+                startDrag(x, y, corner)
             } else {
                 deselect()
                 looping = true
@@ -564,6 +603,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val which = if (page == null) emptyList() else Lasso.select(page.strokes, loop.copyOf(loopSize))
         picked = if (which.isEmpty()) null else Picked(strokePage, which)
         marks.update()
+        onSelect?.invoke()
     }
 
     /** Lets go of what the lasso took. True if something was taken. */
@@ -572,30 +612,80 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         picked = null
         looping = false
         if (lift != null) cancelDrag()
-        if (had) marks.update()
+        if (had) {
+            marks.update()
+            onSelect?.invoke()
+        }
         return had
     }
 
-    /** The box around what was taken, in page points of its page; null if nothing is. */
-    private fun box(): FloatArray? {
-        val p = picked ?: return null
-        val strokes = document?.pages?.getOrNull(p.page)?.strokes ?: return null
-        val b = Lasso.bounds(p.which.mapNotNull { strokes.getOrNull(it) })
-        val pad = BOX_PAD
-        return floatArrayOf(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad)
+    /** What was taken, ink and highlighter as they are on the page. */
+    private fun taken(): List<Stroke> {
+        val p = picked ?: return emptyList()
+        val strokes = document?.pages?.getOrNull(p.page)?.strokes ?: return emptyList()
+        return p.which.mapNotNull { strokes.getOrNull(it) }
     }
 
-    /** The box on screen, following a drag. */
+    /** The colour of what was taken, if its ink is all one colour (the highlighter when there is no ink). */
+    val selectionColor: Int?
+        get() {
+            val strokes = taken()
+            val ink = strokes.filter { it.tool == Tool.PEN }.ifEmpty { strokes }
+            return ink.map { it.color }.distinct().singleOrNull()
+        }
+
+    /**
+     * Gives what was taken [color]: its ink, or its highlighter when there is no ink (the
+     * pen's colours on a highlighter would read as ink). One undo. False if nothing is taken.
+     */
+    fun recolor(color: Int): Boolean {
+        val p = picked ?: return false
+        val strokes = document?.pages?.getOrNull(p.page)?.strokes ?: return false
+        val inkOnly = p.which.filter { strokes.getOrNull(it)?.tool == Tool.PEN }
+        document?.recolor(p.page, inkOnly.ifEmpty { p.which }, color)
+        redraw()
+        onChange?.invoke()
+        onSelect?.invoke()
+        return true
+    }
+
+    /** The content's bounds (strokes and their width), page points, before any drag. */
+    private fun content(): FloatArray? {
+        val strokes = taken()
+        return if (strokes.isEmpty()) null else Lasso.bounds(strokes)
+    }
+
+    /** The box on screen, following a drag or a resize. */
     private fun screenBox(out: RectF): Boolean {
         val p = picked ?: return false
-        val b = box() ?: return false
+        val b = content() ?: return false
         val pages = document?.pages ?: return false
         val top = Render.top(pages, p.page)
-        val dx = if (lift != null) liftX else 0f
-        val dy = if (lift != null) liftY else 0f
-        out.set(offsetX + (b[0] + dx) * scale, offsetY + (top + b[1] + dy) * scale,
-            offsetX + (b[2] + dx) * scale, offsetY + (top + b[3] + dy) * scale)
+        val l = lift
+        var x0 = b[0]; var y0 = b[1]; var x1 = b[2]; var y1 = b[3]
+        if (l != null) {
+            val k = liftK
+            x0 = l.ax + (x0 - l.ax) * k + liftX; x1 = l.ax + (x1 - l.ax) * k + liftX
+            y0 = l.ay + (y0 - l.ay) * k + liftY; y1 = l.ay + (y1 - l.ay) * k + liftY
+        }
+        val pad = BOX_PAD
+        out.set(offsetX + (x0 - pad) * scale, offsetY + (top + y0 - pad) * scale,
+            offsetX + (x1 + pad) * scale, offsetY + (top + y1 + pad) * scale)
         return true
+    }
+
+    /** The corner handle under a point on screen: 0 top-left, 1 top-right, 2 bottom-left, 3 bottom-right; -1 none. */
+    private fun handleAt(x: Float, y: Float): Int {
+        if (!screenBox(hit)) return -1
+        val reach = HANDLE_HIT * resources.displayMetrics.density
+        val corners = listOf(hit.left to hit.top, hit.right to hit.top, hit.left to hit.bottom, hit.right to hit.bottom)
+        var best = -1
+        var nearest = reach
+        for ((n, c) in corners.withIndex()) {
+            val d = hypot(x - c.first, y - c.second)
+            if (d <= nearest) { nearest = d; best = n }
+        }
+        return best
     }
 
     private val hit = RectF()
@@ -608,26 +698,49 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         return hit.contains(x, y)
     }
 
-    private fun startDrag(x: Float, y: Float) {
+    /** Lifts what was taken to drag it from [x], [y], or to resize it by [corner] (see [handleAt]; -1 moves). */
+    private fun startDrag(x: Float, y: Float, corner: Int = -1) {
         val p = picked ?: return
         val pages = document?.pages ?: return
         val page = pages.getOrNull(p.page) ?: return
-        val b = box() ?: return
+        val c = content() ?: return
+        val pad = BOX_PAD
         val set = p.which.toHashSet()
         val without = pages.mapIndexed { i, pg -> if (i == p.page) pg.with(pg.strokes.filterIndexed { k, _ -> k !in set }) else pg }
         dragFromX = x; dragFromY = y
-        liftX = 0f; liftY = 0f
+        liftX = 0f; liftY = 0f; liftK = 1f
+        // The pulled corner and the opposite one, held.
+        val right = corner == 1 || corner == 3
+        val bottom = corner == 2 || corner == 3
+        val cx = if (right) c[2] else c[0]; val cy = if (bottom) c[3] else c[1]
+        val ax = if (right) c[0] else c[2]; val ay = if (bottom) c[1] else c[3]
+        val w = c[2] - c[0]; val h = c[3] - c[1]
+        // Not smaller than a few points, and not out of the sheet.
+        val minK = (MIN_SIZE / maxOf(w, h, 0.01f)).coerceAtMost(1f)
+        val maxK = minOf(
+            if (w > 0f) (if (right) page.width - ax else ax) / w else Float.MAX_VALUE,
+            if (h > 0f) (if (bottom) page.height - ay else ay) / h else Float.MAX_VALUE).coerceAtLeast(1f)
         // The box stays on its sheet: ink pushed off the page would be there but never seen.
         lift = Lift(p.page, Render.top(pages, p.page), p.which.mapNotNull { page.strokes.getOrNull(it) }, without,
-            minOf(0f, -b[0]), maxOf(0f, page.width - b[2]), minOf(0f, -b[1]), maxOf(0f, page.height - b[3]))
+            minOf(0f, pad - c[0]), maxOf(0f, page.width - pad - c[2]), minOf(0f, pad - c[1]), maxOf(0f, page.height - pad - c[3]),
+            corner, ax, ay, cx, cy, minK, maxK)
         actions.visibility = GONE
         redraw()
     }
 
     private fun dragTo(x: Float, y: Float) {
         val l = lift ?: return
-        liftX = ((x - dragFromX) / scale).coerceIn(l.minX, l.maxX)
-        liftY = ((y - dragFromY) / scale).coerceIn(l.minY, l.maxY)
+        val dx = (x - dragFromX) / scale
+        val dy = (y - dragFromY) / scale
+        if (l.corner < 0) {
+            liftX = dx.coerceIn(l.minX, l.maxX)
+            liftY = dy.coerceIn(l.minY, l.maxY)
+        } else {
+            // Same proportions: how far along its diagonal the pulled corner went.
+            val vx = l.cx - l.ax; val vy = l.cy - l.ay
+            val length = vx * vx + vy * vy
+            liftK = if (length == 0f) 1f else (((vx + dx) * vx + (vy + dy) * vy) / length).coerceIn(l.minK, l.maxK)
+        }
         redraw()
     }
 
@@ -635,13 +748,47 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     private fun drop() {
         val l = lift ?: return
         val p = picked
-        val dx = liftX; val dy = liftY
+        val dx = liftX; val dy = liftY; val k = liftK
         lift = null
-        if (p != null && (dx != 0f || dy != 0f)) {
+        if (p != null && l.corner < 0 && (dx != 0f || dy != 0f)) {
             document?.move(l.page, p.which, dx, dy)
             onChange?.invoke()
         }
+        if (p != null && l.corner >= 0 && k != 1f) {
+            document?.scale(l.page, p.which, l.ax, l.ay, k)
+            onChange?.invoke()
+        }
         redraw()
+    }
+
+    private fun copySelection() {
+        Clipboard.clip = Clip.of(taken())
+        marks.update()
+    }
+
+    /**
+     * What was copied, in the middle of what is in view on the page there, taken so it can be
+     * dragged into place. Then "Pegar" goes away (until something else is copied).
+     */
+    fun paste() {
+        val clip = Clipboard.clip ?: return
+        val doc = document ?: return
+        val pages = doc.pages
+        if (scale == 0f) return
+        val n = currentPage
+        val page = pages[n]
+        val top = Render.top(pages, n)
+        val cx = (width / 2f - offsetX) / scale
+        val cy = (height / 2f - offsetY) / scale - top
+        val pad = BOX_PAD
+        val x = (cx - clip.width / 2).coerceIn(pad, maxOf(pad, page.width - pad - clip.width))
+        val y = (cy - clip.height / 2).coerceIn(pad, maxOf(pad, page.height - pad - clip.height))
+        val which = doc.paste(n, clip.at(x, y))
+        Clipboard.clip = null
+        picked = Picked(n, which)
+        redraw()
+        onChange?.invoke()
+        onSelect?.invoke()
     }
 
     /** The drag was the palm: everything back where it was. */
@@ -893,6 +1040,12 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             val page = it.pages[it.page]
             canvas.clipRect(0f, 0f, page.width, page.height)
             canvas.translate(liftX, liftY)
+            val k = liftK
+            if (k != 1f) {
+                canvas.translate(it.ax, it.ay)
+                canvas.scale(k, k)
+                canvas.translate(-it.ax, -it.ay)
+            }
             // The highlighter under the ink, as on the page.
             for (stroke in it.strokes) if (stroke.tool == Tool.HIGHLIGHTER) brush.render.stroke(canvas, stroke)
             for (stroke in it.strokes) if (stroke.tool != Tool.HIGHLIGHTER) brush.render.stroke(canvas, stroke)
@@ -1011,6 +1164,9 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             if (now || shown) invalidate()
             shown = now
             place()
+            val paste = lassoing && Clipboard.clip != null && !looping && lift == null
+            val want = if (paste) VISIBLE else GONE
+            if (pasteChip.visibility != want) pasteChip.visibility = want
         }
 
         private fun place() {
@@ -1035,8 +1191,18 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             // The light blue is lost on light paper: the deep one there.
             paint.color = if (darkPaper) Ui.ACCENT else Ui.ACCENT_DEEP
             if (looping) canvas.drawPath(loopPath, paint)
-            if (screenBox(r)) canvas.drawRoundRect(r, 6f * d, 6f * d, paint)
+            if (!screenBox(r)) return
+            canvas.drawRoundRect(r, 6f * d, 6f * d, paint)
+            // A handle at each corner to make it bigger or smaller.
+            val ring = paint.color
+            for ((x, y) in listOf(r.left to r.top, r.right to r.top, r.left to r.bottom, r.right to r.bottom)) {
+                handle.style = Paint.Style.FILL; handle.color = Ui.BRIGHT
+                canvas.drawCircle(x, y, 9f * d, handle)
+                handle.style = Paint.Style.STROKE; handle.color = ring; handle.strokeWidth = 3f * d
+                canvas.drawCircle(x, y, 9f * d, handle)
+            }
         }
+        private val handle = Paint(Paint.ANTI_ALIAS_FLAG)
     }
 
     /** Everything in onDraw, one frame behind the pen. */
@@ -1165,6 +1331,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         const val BOX_PAD = 8f
         /** dp around the box that still count as on it, for a finger. */
         const val HIT = 12f
+        /** dp from a corner handle that still take it. */
+        const val HANDLE_HIT = 24f
+        /** Points: what the lasso took is not made smaller than this. */
+        const val MIN_SIZE = 4f
         /** dp the eraser reaches around the pen tip. */
         const val RUB = 10f
         /** Holding the pen this long, this still (dp), at the end of a stroke tidies it. */
