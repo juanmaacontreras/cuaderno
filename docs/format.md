@@ -1,14 +1,14 @@
-# The notebook file (format 2)
+# The notebook file (format 3)
 
 One notebook is one file, `<name>.cuaderno`: a zip. The file is the truth; anything else the
 app keeps (library index, thumbnails) is a cache it can rebuild by reading the files.
 Code: `core/src/main/kotlin/cuaderno/core/` (`NotebookFile`, `StrokeCodec`). Tests and the
-kept fixtures: `core/src/test/` (`FormatTest`, `resources/v1.cuaderno`, `resources/v2.cuaderno`).
+kept fixtures: `core/src/test/` (`FormatTest`, `resources/v1.cuaderno`, `resources/v2.cuaderno`, `resources/v3.cuaderno`).
 
 ```
 manifest.json
 pages/<page id>.strokes
-attachments/<name>          (pictures' image files since format 2; a background PDF in phase 4)
+attachments/<name>          (pictures' image files since format 2, imported PDFs since 3; stored, not compressed)
 ```
 
 ## manifest.json
@@ -34,6 +34,7 @@ attachments/<name>          (pictures' image files since format 2; a background 
   in page points, never screen pixels, so a page looks the same on any device.
 - `paper`: `blank`, `ruled`, `grid` or `dotted`.
 - `pictures` (format 2, only on a page that has any): see below.
+- `pdf` (format 3, only on a page of an imported PDF): see below.
 - A reader ignores manifest keys it does not know.
 
 ## Pictures (format 2)
@@ -53,7 +54,28 @@ attachments/<name>          (pictures' image files since format 2; a background 
 - In memory each `Picture` carries its bytes, so a page copied anywhere (duplicated, to the
   trash and back, pasted into another notebook) takes its pictures with it.
 - **A notebook without pictures is still written as format 1**, so an app from before pictures
-  keeps opening it; only a notebook with at least one picture is written as 2.
+  keeps opening it; only a notebook with at least one picture is written as 2 (3 with a PDF).
+
+## A PDF to write on (format 3)
+
+```json
+"pdf": {"file": "attachments/pdf-9c1f0e2a7b3d4c5e6f70.pdf", "page": 0}
+```
+
+- The page is that page of the PDF (`page` counts from 0), drawn on the sheet instead of the
+  paper and under pictures and ink. The page's `width` and `height` are the PDF page's, in points.
+- `file`: like a picture's, named by its content (`pdf-` and 20 hex digits of its SHA-256): the
+  whole PDF is one file however many pages use it. Missing, a bad name or a negative `page`:
+  `FormatException`. A `page` past the PDF's end, or a PDF the reader cannot open, shows plain
+  paper; the file and the ink stay as they are.
+- Importing makes one page per PDF page; a page added after one is a plain blank page of its
+  size. Each `Page` in memory carries the PDF's bytes (one shared array), so duplicating, the
+  trash and back keep it. A page sent to the trash takes the whole PDF with it.
+- Attachments (pictures and PDFs) are written stored, without compression: they are
+  compressed already, and a big PDF is copied on every save.
+
+**A notebook is written in the oldest format that holds it:** 1 with nothing more than ink,
+2 with pictures, 3 with a PDF.
 
 ## pages/<id>.strokes
 
@@ -114,7 +136,7 @@ Lost or unreadable, it is ignored and rebuilt: only colours, order and `last` go
 `files/trash/`, beside `notebooks/` (never inside it, so it is never taken for a subject).
 Each deleted thing is two files with the same stem (`t<date digits>-<n>`):
 
-- `<stem>.cuaderno`: a notebook file (format 1, or 2 with pictures). A deleted notebook is its own file, moved here; a deleted page is
+- `<stem>.cuaderno`: a notebook file (format 1, 2 or 3, like any). A deleted notebook is its own file, moved here; a deleted page is
   kept as a notebook of that one page.
 - `<stem>.json`, written atomically before the notebook file moves:
 
@@ -131,11 +153,11 @@ skipped and its file kept. Code: `cuaderno.core.Trash`.
 ## Changing the format
 
 1. Raise `FORMAT` (or the strokes `VERSION`) and keep reading every older one.
-2. Save a fixture of the version being left (`CUADERNO_FIXTURE=<path> gradle :core:test`
-   writes one) into `core/src/test/resources/` and add a test that opens it.
+2. Save a fixture of the version being left (`CUADERNO_FIXTURE=<path>` writes v2,
+   `CUADERNO_FIXTURE_V3=<path>` v3, while `gradle :core:test` runs) into `core/src/test/resources/` and add a test that opens it.
 3. Update this file in the same PR.
 
 ## Not in the format yet
 
-Saved versions (phase 1), PDF backgrounds (4), text boxes (5). Each is expected to add
+Saved versions (phase 1), favourite pages and the PDF's own index (4), text boxes (5). Each is expected to add
 manifest keys or entries, with a format bump when an older reader would lose it.

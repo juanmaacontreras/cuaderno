@@ -103,11 +103,11 @@ class FormatTest {
         val newer = folder.newFile("b.cuaderno")
         java.util.zip.ZipOutputStream(newer.outputStream()).use { zip ->
             zip.putNextEntry(java.util.zip.ZipEntry("manifest.json"))
-            zip.write("""{"format":3,"id":"x","title":"x","created":"","modified":"","pages":[]}""".toByteArray())
+            zip.write("""{"format":4,"id":"x","title":"x","created":"","modified":"","pages":[]}""".toByteArray())
             zip.closeEntry()
         }
         val error = assertThrows(FormatException::class.java) { NotebookFile.read(newer) }
-        assertTrue(error.message!!.contains("format 3"))
+        assertTrue(error.message!!.contains("format 4"))
         assertThrows(FormatException::class.java) { NotebookFile.read(folder.newFile("empty.cuaderno")) }
     }
 
@@ -171,6 +171,89 @@ class FormatTest {
         val back = NotebookFile.read(file)
         assertSame(withPictures(), back)
         assertEquals(withPictures().pages.map { it.pictures }, back.pages.map { it.pictures })
+    }
+
+    // --- format 3: a PDF to write on --------------------------------------------------
+
+    private val guide = "%PDF-1.4 a made-up handout".toByteArray() + ByteArray(500) { (it * 13).toByte() }
+
+    /** Three PDF pages (the second Letter size, written on), then a blank page of the notebook's own. */
+    private fun withPdf(): Notebook {
+        val name = PdfPage.nameFor(guide)
+        val n = sample()
+        val pages = listOf(
+            Page("p1", 595f, 842f, Paper.BLANK, emptyList(), pdf = PdfPage(name, guide, 0)),
+            Page("p2", 612f, 792f, Paper.BLANK, n.pages[0].strokes, pdf = PdfPage(name, guide, 1)),
+            Page("p3", 595f, 842f, Paper.BLANK, emptyList(), listOf(Picture(Picture.nameFor(photo, "jpg"), photo, 1f, 2f, 3f, 4f)), PdfPage(name, guide, 2)),
+            Page("p4", 595f, 842f, Paper.GRID, emptyList()))
+        return Notebook(n.id, n.title, n.created, n.modified, pages)
+    }
+
+    @Test fun aPdfComesBackOnItsPagesAndIsKeptOnce() {
+        val file = folder.newFile("pdf.cuaderno")
+        NotebookFile.write(file, withPdf())
+        assertTrue(manifest(file).contains("\"format\":3"))
+        val entries = java.util.zip.ZipFile(file).use { zip -> zip.entries().toList() }
+        assertEquals("one file for the PDF's three pages", 1, entries.count { it.name.startsWith("attachments/pdf-") })
+        assertEquals("stored, not compressed again", java.util.zip.ZipEntry.STORED, entries.first { it.name.startsWith("attachments/pdf-") }.method)
+        val back = NotebookFile.read(file)
+        assertSame(withPdf(), back)
+        assertEquals(withPdf().pages.map { it.pdf }, back.pages.map { it.pdf })
+        assertEquals(listOf(612f, 792f), listOf(back.pages[1].width, back.pages[1].height))
+        assertArrayEquals(guide, back.pages[0].pdf!!.bytes)
+        assertTrue("one array for every page, so it is opened once", back.pages[0].pdf!!.bytes === back.pages[2].pdf!!.bytes)
+        assertEquals("pictures still come back beside it", 1, back.pages[2].pictures.size)
+        assertEquals("the cover is the PDF's first page", 0, NotebookFile.summary(file).first!!.pdf!!.index)
+        assertTrue(back.attachments.isEmpty())
+    }
+
+    @Test fun aPdfPageIsNeverABlankPage() {
+        val page = withPdf().pages[0]
+        assertFalse(page.isBlank)
+        val file = folder.newFile("one.cuaderno")
+        val n = withPdf()
+        NotebookFile.write(file, Notebook(n.id, n.title, n.created, n.modified, n.pages.take(3)))
+        assertEquals("a PDF page at the end is counted", 3, NotebookFile.summary(file).pages)
+        val doc = Document(NotebookFile.read(file))
+        assertEquals("and opened", 3, doc.pages.size)
+        assertEquals("every copy of a page keeps its PDF", page.pdf, page.withId("x").withPaper(Paper.GRID).with(emptyList()).pdf)
+    }
+
+    @Test fun aPageAddedAfterAPdfPageIsBlankAndOfItsSize() {
+        val n = withPdf()
+        val doc = Document(n)
+        doc.insertAfter(1)
+        val added = doc.pages[2]
+        assertEquals(null, added.pdf)
+        assertEquals(listOf(612f, 792f), listOf(added.width, added.height))
+    }
+
+    @Test fun aPdfWhoseFileIsMissingOrPageIsWrongIsAnError() {
+        for (pdf in listOf(""""file":"attachments/pdf-0.pdf","page":0""", """"file":"../x.pdf","page":0""")) {
+            val file = folder.newFile()
+            java.util.zip.ZipOutputStream(file.outputStream()).use { zip ->
+                zip.putNextEntry(java.util.zip.ZipEntry("manifest.json"))
+                zip.write(("""{"format":3,"id":"x","title":"x","created":"","modified":"","pages":[{"id":"p1","width":595,"height":842,""" +
+                    """"paper":"blank","strokes":"pages/p1.strokes","pdf":{$pdf}}]}""").toByteArray())
+                zip.closeEntry()
+                zip.putNextEntry(java.util.zip.ZipEntry("pages/p1.strokes"))
+                zip.write(StrokeCodec.encode(emptyList()))
+                zip.closeEntry()
+            }
+            assertThrows(FormatException::class.java) { NotebookFile.read(file) }
+        }
+        val n = withPdf()
+        val bad = Notebook(n.id, n.title, n.created, n.modified, listOf(Page("p1", 1f, 1f, Paper.BLANK, emptyList(), pdf = PdfPage("x.pdf", guide, -1))))
+        assertThrows(IllegalArgumentException::class.java) { NotebookFile.write(folder.newFile(), bad) }
+    }
+
+    @Test fun aVersion3NotebookStillOpens() {
+        System.getenv("CUADERNO_FIXTURE_V3")?.let { NotebookFile.write(File(it), withPdf()) }
+        val file = folder.newFile("v3.cuaderno")
+        javaClass.getResourceAsStream("/v3.cuaderno")!!.use { input -> file.outputStream().use { input.copyTo(it) } }
+        val back = NotebookFile.read(file)
+        assertSame(withPdf(), back)
+        assertEquals(withPdf().pages.map { it.pdf }, back.pages.map { it.pdf })
     }
 
     @Test fun pageIdsCannotEscapeTheFile() {
