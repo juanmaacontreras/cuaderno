@@ -6,7 +6,7 @@ Updated: 2026-11-19. Read with `CLAUDE.md` at the start of a session; update at 
 
 **Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
 built: library, pages panel, pulling for a new page, trash; waiting for his week of classes
-with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27), pictures (v28): phase 3 built. Phase 4: PDF import (v30).**
+with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27), pictures (v28): phase 3 built. Phase 4: PDF import (v30), export keeping the PDF (v31).**
 
 The app opens on the last notebook; the bar's top button goes to the library (subjects down
 the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
@@ -24,6 +24,13 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Export keeping the PDF (v31, phase 4 slice 2): tested with PdfBox building real PDFs and
+  drawing the result (text extracted from the export, ink at the written spot and nowhere
+  else although the PDF leaves its drawing state changed, a page turned 90 degrees, the
+  notebook's own grid page with ink and highlighter, a blank page left out, a PDF locked
+  against changes), three checks seen failing with the code broken on purpose (a fourth showed
+  a line that did nothing: removed). Emulator: exported from the menu, the file checked on
+  the PC (2 pages, the text extracts, the ink in place, 2.9 KB). Not on the tablet.
 - Import a PDF and write on it, format 3 (v30, phase 4 slice 1): tested (core: format 3 round
   trip with one file for the whole PDF and one shared array, the oldest format that holds a
   notebook, a PDF page is never blank, a page added after one is blank and of its size, bad
@@ -110,8 +117,8 @@ points, shared by screen and PDF), `Store`,
    colour, copy, cut, paste (v27); pictures (v28, format 2). Phase 3 is built: its test is
    redoing an exercise rearranging parts without rewriting (plan). Shapes (also phase 3 in the
    plan) wait for what feels odd about holding the pen still.
-5. Phase 4 (PDF), approved 2026-11-19: import and write on it (v30, format 3). Next: export
-   keeping the PDF's text (try PdfBox-Android, plan), then favourite pages and the PDF's index. Juanma is away: he tries
+5. Phase 4 (PDF), approved 2026-11-19: import and write on it (v30, format 3); export keeping
+   the PDF's text (v31). Next: favourite pages, then the PDF's own index. Juanma is away: he tries
    v24..v26+ together when back, then the week of classes.
    **Phase 2, in slices** (designs `fase2-*.png` approved). Done: notebooks and the library
    (v20), the pages panel (v21), the paper redrawn at once (v22), pages added by pulling (v23),

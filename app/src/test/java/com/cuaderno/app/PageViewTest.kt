@@ -328,7 +328,7 @@ class PageViewTest {
     /** The PDF itself needs Android's real PDF writer, which the tests do not have: checked on a device. */
     @Test fun anEmptyNotebookExportsNothing() {
         val out = File(folder.root, "out.pdf")
-        assertFalse(PdfExport.write(page().document!!.pages, out))
+        assertFalse(PdfExport.write(RuntimeEnvironment.getApplication(), page().document!!.pages, out))
         assertFalse(out.exists())
     }
 

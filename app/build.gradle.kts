@@ -69,6 +69,12 @@ dependencies {
     // Low-latency drawing: the stroke in progress goes to the front buffer (page/PageView.kt).
     implementation("androidx.graphics:graphics-core:1.0.4")
 
+    // Exporting a notebook with an imported PDF keeps the PDF as it was (its text stays text)
+    // and adds the ink on top as vectors: PdfBox, Apache 2.0, the Android port (PdfExport.kt).
+    // Without BouncyCastle (14 MB): it only serves PDFs locked with certificates. Password and
+    // permission locks, the usual ones, go through Java's own ciphers.
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0") { exclude(group = "org.bouncycastle") }
+
     testImplementation("junit:junit:4.13.2")
     // Draws the real screens to PNG without a device (tools/screens.sh).
     testImplementation("org.robolectric:robolectric:4.14.1")

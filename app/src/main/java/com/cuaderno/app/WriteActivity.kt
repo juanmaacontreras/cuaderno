@@ -378,7 +378,7 @@ class WriteActivity : Activity() {
         val name = document.title.replace(Regex("[^\\p{L}\\p{N} ._-]"), "").trim().ifEmpty { "cuaderno" }
         val file = File(cacheDir, "exports/$name.pdf")
         thread(name = "cuaderno-export") {
-            val done = try { PdfExport.write(pages, file, dark) } catch (e: Exception) { null }
+            val done = try { PdfExport.write(this, pages, file, dark) } catch (e: Exception) { null }
             runOnUiThread {
                 when (done) {
                     true -> share(file, "application/pdf", Strings.EXPORT_SHARE)
