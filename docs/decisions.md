@@ -5,6 +5,13 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-23
 
+- **A new page needs the pull held** (origen: Juanma, "si scrolleo de más, sin querer, creo una
+  página nueva... que tenga que mantener unos 2 segundos"; 1.5 s and the look are Claude's).
+  Pulled far enough, the ring round the "+" fills while the finger stays (it says "Mantené
+  para agregar una página"); full, it turns solid, the tablet ticks, and letting go adds the
+  page. Let go earlier, nothing happens. A small tremble does not restart it. The time is
+  one number (`PULL_HOLD_MS`).
+
 - **Zooming out goes past the full width** (origen: Juanma, "que pueda hacer un poquito más de
   zoom out"; the limit is Claude's). The sheet now stays as small as a whole page on the
   screen (lying down, about half the width), and never under three quarters of the width

@@ -24,6 +24,12 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- A new page needs the pull held (v34): tested (`PageViewTest`: a little, far and let go at
+  once, held too short add nothing; held adds one and shows its top), seen failing with the old
+  rule. The coast test needed the clock moved past earlier tests (Robolectric turns it back,
+  Android's pooled velocity tracker does not). Emulator: the ring filling and the solid "Soltá".
+  Not on the tablet.
+
 - Zooming out to a whole page (v33): tested (`PageViewTest`: left smaller it stays, centred;
   pinched past a whole page it springs back to it; zooming in again), seen failing with the old
   limit. Emulator: a raw two-finger pinch (sendevent, root) left the sheet small and centred.
