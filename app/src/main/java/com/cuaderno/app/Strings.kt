@@ -90,7 +90,9 @@ object Strings {
     fun restoredTo(where: String) = "Recuperado en $where"
 
     const val UPDATE = "Actualizar"
-    const val UPDATE_DOWNLOADING = "Bajando…"
+    const val UPDATE_INSTALL = "Instalar"
+    fun updateDownloading(percent: Int) = if (percent < 0) "Bajando…" else "Bajando… $percent %"
     const val UPDATE_PERMISSION = "Permití instalar apps desde Cuaderno y tocá de nuevo"
-    const val UPDATE_FAILED = "No se pudo bajar la actualización"
+    const val UPDATE_FAILED = "No se pudo bajar la actualización: revisá la conexión y tocá de nuevo"
+    const val UPDATE_OPEN_FAILED = "No se pudo abrir el instalador: tocá Instalar de nuevo"
 }

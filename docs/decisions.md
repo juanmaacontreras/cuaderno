@@ -5,6 +5,17 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-23
 
+- **The updater shows its progress and survives leaving the screen** (origen: Juanma reported
+  "toco actualizar y se queda en bajando y no pasa nada"; the fix is Claude's). The button
+  reads "Bajando… N %"; the APK is written to a `.part` file renamed only when whole, and kept
+  as `update-v<N>.apk`, so a second tap or a return to the app reuses it ("Instalar · vN")
+  instead of downloading again; a tap during a download is ignored; a server silent for 20 s
+  fails with a message instead of waiting forever. Why: on the emulator the old updater
+  worked with a fast network, so the tablet's hang is a guess (origen: Claude): the APK grew
+  to 12 MB with PdfBox (v31) and a slow Wi-Fi showed no sign of life, and Android refuses to
+  open the installer from an app that left the screen during the download, silently.
+  Enlace's copy of `Updater.kt` still has the old behaviour.
+
 - **Hold a finger to paste, there** (origen: Juanma, "no me gusta ir a los 3 puntitos y tocar
   pegar imagen; me gustaría mantener y que ahí me aparezca pegar"; the details are Claude's).
   A finger held still on the page for half a second shows "Pegar" just above it (below when

@@ -24,6 +24,13 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Updater with progress (kit `Updater`): tested (`UpdaterDownloadTest` against a local
+  server: whole file with percents up to 100, GitHub's redirect, a cut download leaves no
+  file, an error status fails; the cut check seen failing with the length check removed).
+  Emulator with the network slowed by `tc`: "Bajando… 9 %", "22 %"; a second tap ignored;
+  left the app mid-download, came back to "Instalar · v36", tapped, installed v36; with the
+  network stalled mid-download it failed after 21 s with the message and the button back.
+  Not on the tablet: the cause of his hang there is a guess (see decisions, 2026-11-23).
 - Hold a finger to paste (v36): tested (`LassoViewTest`: "Pegar" after 0.5 s and not before,
   above the finger, the page not moved, pasted centred on the point; a moving finger, nothing
   copied, the pen: no "Pegar"; `PastedTest`: the newer copy wins, the clipboard's time read),
