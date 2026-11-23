@@ -3,6 +3,21 @@
 Newest first. "origen" says who decided: Juanma, or Claude (a suggestion until he confirms).
 The plan (`plan.md`) is corrected here when reality contradicts it.
 
+## 2026-11-23
+
+- **Pictures from the clipboard and the gallery** (origen: Juanma, "copiar y pegar imágenes
+  del portapapeles, o de la galería", to start using the app; the details are Claude's). The
+  ⋮ menu has "Pegar imagen" whenever Android's clipboard holds something: an image copied in
+  another app (Chrome's "Copiar imagen", a screenshot, the Gallery) is read only when tapped
+  (Android then shows its "pegó desde el portapapeles" notice, as it should) and goes on the
+  page exactly as one inserted does (upright, at most 1600 px, JPEG, taken with the lasso).
+  Copied text is not pasted: a page has no text; it says "Lo copiado no es una imagen".
+  "Insertar imagen" now opens Android's photo picker (the gallery grid, no permission) on
+  Android 13 and later, the file picker before that or if the photo picker will not open; the
+  file picker reached Drive and other folders, the photo picker shows what the gallery shows.
+  The lasso's own "Copiar"/"Pegar" stay inside the app (strokes are not an image); copying a
+  selection out to other apps as a picture is not done.
+
 ## 2026-11-19
 
 - **Export keeps the PDF as it came (phase 4, slice 2)** (origen: the plan, "probar

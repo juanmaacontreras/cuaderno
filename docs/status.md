@@ -1,12 +1,12 @@
 # Status
 
-Updated: 2026-11-19. Read with `CLAUDE.md` at the start of a session; update at the end.
+Updated: 2026-11-23. Read with `CLAUDE.md` at the start of a session; update at the end.
 
 ## Where it is
 
 **Phase 1 (write a page) built, waiting for his class-long trial. Phase 2 (notebooks) in
 built: library, pages panel, pulling for a new page, trash; waiting for his week of classes
-with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27), pictures (v28): phase 3 built. Phase 4: PDF import (v30), export keeping the PDF (v31).**
+with it. Phase 3 (lasso) approved and being built in slices: take, move, delete (v26), size, colour, copy, cut, paste (v27), pictures (v28): phase 3 built. Phase 4: PDF import (v30), export keeping the PDF (v31). Pictures pasted from the clipboard and picked from the gallery (v32).**
 
 The app opens on the last notebook; the bar's top button goes to the library (subjects down
 the left, notebooks as covers, new notebook with its subject and paper). Sheets are A4, light
@@ -23,6 +23,14 @@ points, shared by screen and PDF), `Store`,
 `PdfExport`, `WriteActivity`, `LibraryActivity`, `PagesPanel`.
 
 ## Verified, and not
+
+- Pictures from the clipboard and the gallery (v32): tested (`PastedTest`: an image another app
+  copied as a link comes in at its size as JPEG, a big one no longer than 1600 px, text and a
+  link to a PDF give nothing, nothing copied offers nothing), two checks seen failing with the
+  code broken on purpose. Emulator: an image copied in Chrome, "Pegar imagen" in the menu put
+  it on the page under the ink, taken with the lasso; "Insertar imagen" opened the photo picker
+  and a gallery photo came in. Not on the tablet: Samsung's own Gallery and screenshot "Copiar"
+  are untried.
 
 - Export keeping the PDF (v31, phase 4 slice 2): tested with PdfBox building real PDFs and
   drawing the result (text extracted from the export, ink at the written spot and nowhere

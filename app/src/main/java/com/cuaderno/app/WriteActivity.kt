@@ -2,7 +2,9 @@ package com.cuaderno.app
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -310,6 +312,7 @@ class WriteActivity : Activity() {
     private fun menu(anchor: View) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, 5, 0, Strings.INSERT_PICTURE)
+        if (Pasted.hasSomething(this)) popup.menu.add(0, 6, 0, Strings.PASTE_PICTURE)
         popup.menu.add(0, 1, 0, Strings.EXPORT)
         popup.menu.add(0, 3, 1, if (page.darkPaper) Strings.PAPER_LIGHT else Strings.PAPER_DARK)
         popup.menu.add(0, 2, 2, if (recorder.recording) Strings.RECORD_STOP else Strings.RECORD)
@@ -318,6 +321,7 @@ class WriteActivity : Activity() {
             when (item.itemId) {
                 1 -> export()
                 5 -> pickPicture()
+                6 -> pastePicture()
                 2 -> if (recorder.recording) stopRecording() else recorder.begin()
                 4 -> if (page.onFluency != null) {
                     page.onFluency = null
@@ -336,14 +340,41 @@ class WriteActivity : Activity() {
         popup.show()
     }
 
-    /** Android's own picker: photos, screenshots, files. The page itself asks for no permission. */
+    /**
+     * The gallery: Android's photo picker where there is one (13 and later: photos and
+     * screenshots in a grid, no permission), the file picker otherwise or if it will not open.
+     */
     private fun pickPicture() {
-        val pick = Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
-        try {
-            @Suppress("DEPRECATION") startActivityForResult(pick, PICK_PICTURE)
-        } catch (e: Exception) {
-            toast(Strings.PICTURE_FAILED)
+        val gallery = if (Build.VERSION.SDK_INT >= 33) Intent(MediaStore.ACTION_PICK_IMAGES) else null
+        val files = Intent(Intent.ACTION_GET_CONTENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE)
+        for (pick in listOfNotNull(gallery, files)) {
+            try {
+                @Suppress("DEPRECATION") startActivityForResult(pick, PICK_PICTURE)
+                return
+            } catch (e: Exception) {
+                // The next one.
+            }
         }
+        toast(Strings.PICTURE_FAILED)
+    }
+
+    /** The image copied in another app, read now (Android hands it over only while the app is in front). */
+    private fun pastePicture() {
+        val clip = Pasted.current(this)
+        if (Pasted.uris(clip).isEmpty()) {
+            toast(Strings.PASTE_NONE)
+            return
+        }
+        thread(name = "cuaderno-paste") {
+            val ready = Pasted.picture(this, clip)
+            runOnUiThread { if (ready == null) toast(Strings.PASTE_NONE) else place(ready) }
+        }
+    }
+
+    private fun place(ready: Pictures.Ready) {
+        widthPanel.visibility = View.GONE
+        page.insertPicture(ready.name, ready.bytes, ready.width, ready.height)
+        renderBar()
     }
 
     @Deprecated("Still the simplest way back on every Android it runs on")
@@ -353,15 +384,7 @@ class WriteActivity : Activity() {
         if (requestCode != PICK_PICTURE || resultCode != RESULT_OK || uri == null) return
         thread(name = "cuaderno-picture") {
             val ready = Pictures.prepare(this, uri)
-            runOnUiThread {
-                if (ready == null) {
-                    toast(Strings.PICTURE_FAILED)
-                } else {
-                    widthPanel.visibility = View.GONE
-                    page.insertPicture(ready.name, ready.bytes, ready.width, ready.height)
-                    renderBar()
-                }
-            }
+            runOnUiThread { if (ready == null) toast(Strings.PICTURE_FAILED) else place(ready) }
         }
     }
 
