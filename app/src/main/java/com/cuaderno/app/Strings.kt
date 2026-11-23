@@ -80,7 +80,6 @@ object Strings {
     const val PDF = "PDF"
     const val INSERT_PICTURE = "Insertar imagen"
     const val PICTURE_FAILED = "No se pudo abrir la imagen"
-    const val PASTE_PICTURE = "Pegar imagen"
     const val PASTE_NONE = "Lo copiado no es una imagen"
     const val TRASHED_NOTEBOOK = "El cuaderno está en la papelera"
     const val TRASHED_PAGE = "La página está en la papelera"

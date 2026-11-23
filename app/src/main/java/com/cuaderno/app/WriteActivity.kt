@@ -13,6 +13,7 @@ import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.cuaderno.app.page.Clipboard
 import com.cuaderno.app.page.PageView
 import com.cuaderno.app.page.Render
 import com.juanma.kit.Ui
@@ -95,6 +96,8 @@ class WriteActivity : Activity() {
         page.onPageShown = { pages.markCurrent(it) }
         page.onSelect = { renderBar() }
         page.onAddPage = { document.addPage(); changed() }
+        page.canPaste = { Clipboard.clip != null || Pasted.hasSomething(this) }
+        page.onPasteAt = { x, y -> pasteAt(x, y) }
         recorder = Recorder(this)
         recorder.addView(page, FrameLayout.LayoutParams(-1, -1))
 
@@ -312,7 +315,6 @@ class WriteActivity : Activity() {
     private fun menu(anchor: View) {
         val popup = PopupMenu(this, anchor)
         popup.menu.add(0, 5, 0, Strings.INSERT_PICTURE)
-        if (Pasted.hasSomething(this)) popup.menu.add(0, 6, 0, Strings.PASTE_PICTURE)
         popup.menu.add(0, 1, 0, Strings.EXPORT)
         popup.menu.add(0, 3, 1, if (page.darkPaper) Strings.PAPER_LIGHT else Strings.PAPER_DARK)
         popup.menu.add(0, 2, 2, if (recorder.recording) Strings.RECORD_STOP else Strings.RECORD)
@@ -321,7 +323,6 @@ class WriteActivity : Activity() {
             when (item.itemId) {
                 1 -> export()
                 5 -> pickPicture()
-                6 -> pastePicture()
                 2 -> if (recorder.recording) stopRecording() else recorder.begin()
                 4 -> if (page.onFluency != null) {
                     page.onFluency = null
@@ -358,8 +359,19 @@ class WriteActivity : Activity() {
         toast(Strings.PICTURE_FAILED)
     }
 
-    /** The image copied in another app, read now (Android hands it over only while the app is in front). */
-    private fun pastePicture() {
+    /**
+     * A finger held on the page and "Pegar" tapped: the newer of what the lasso copied and what
+     * another app put on Android's clipboard, at that point. The clipboard is read only now
+     * (Android hands it over only to the app in front, and says so).
+     */
+    private fun pasteAt(x: Float, y: Float) {
+        val system = Pasted.systemIsNewer(Clipboard.clip != null, Pasted.hasSomething(this),
+            Pasted.stamp(this), Clipboard.systemStamp)
+        if (!system) {
+            page.paste(x, y)
+            renderBar()
+            return
+        }
         val clip = Pasted.current(this)
         if (Pasted.uris(clip).isEmpty()) {
             toast(Strings.PASTE_NONE)
@@ -367,13 +379,13 @@ class WriteActivity : Activity() {
         }
         thread(name = "cuaderno-paste") {
             val ready = Pasted.picture(this, clip)
-            runOnUiThread { if (ready == null) toast(Strings.PASTE_NONE) else place(ready) }
+            runOnUiThread { if (ready == null) toast(Strings.PASTE_NONE) else place(ready, x, y) }
         }
     }
 
-    private fun place(ready: Pictures.Ready) {
+    private fun place(ready: Pictures.Ready, x: Float = page.width / 2f, y: Float = page.height / 2f) {
         widthPanel.visibility = View.GONE
-        page.insertPicture(ready.name, ready.bytes, ready.width, ready.height)
+        page.insertPicture(ready.name, ready.bytes, ready.width, ready.height, x, y)
         renderBar()
     }
 

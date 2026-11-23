@@ -24,6 +24,12 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Hold a finger to paste (v36): tested (`LassoViewTest`: "Pegar" after 0.5 s and not before,
+  above the finger, the page not moved, pasted centred on the point; a moving finger, nothing
+  copied, the pen: no "Pegar"; `PastedTest`: the newer copy wins, the clipboard's time read),
+  seen failing with the paste in the middle and with moving never cancelling. Emulator: an
+  image copied in Chrome, a finger held, "Pegar" above it, pasted there. Not on the tablet.
+
 - A selection dragged to an edge moves the page (v35): tested (`LassoViewTest`: nothing in the
   first 0.4 s, then the page moves and the stroke ends further down than the pen alone took
   it, stopping at the sheet's end; leaving the edge stops it and coming back waits again), seen

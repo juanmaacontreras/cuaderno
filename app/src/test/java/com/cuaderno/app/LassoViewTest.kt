@@ -412,4 +412,54 @@ class LassoViewTest {
         assertTrue(view.offsetY < top)
         view.penUp()
     }
+
+    @Test fun aFingerHeldStillOffersPasteThereAndPastesThere() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        tap(view, item(view, 0))                        // "Copiar"
+        view.deselect()
+        view.canPaste = { Clipboard.clip != null }
+        view.onPasteAt = { x, y -> view.paste(x, y) }
+        val top = view.offsetY
+        touch(view, MotionEvent.ACTION_DOWN, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        idle(300)
+        assertEquals("not yet", View.GONE, view.pasteHere.visibility)
+        idle(300)
+        assertEquals(View.VISIBLE, view.pasteHere.visibility)
+        assertTrue("above the finger", view.pasteHere.y + view.pasteHere.height < 600f)
+        touch(view, MotionEvent.ACTION_UP, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        assertEquals("holding did not move the page", top, view.offsetY, 0.01f)
+        tap(view, view.pasteHere)
+        assertEquals(View.GONE, view.pasteHere.visibility)
+        assertEquals(3, strokes(view).size)
+        // Centred where the finger was: 600 px is (600 - 8) / 2 = 296 points across and down.
+        val pasted = strokes(view)[2]
+        assertEquals(296f, (pasted.bounds[0] + pasted.bounds[2]) / 2, 0.5f)
+        assertEquals(296f, (pasted.bounds[1] + pasted.bounds[3]) / 2, 0.5f)
+    }
+
+    @Test fun aFingerThatMovesOrNothingCopiedOffersNoPaste() {
+        val view = written()
+        var copied = true
+        view.canPaste = { copied }
+        touch(view, MotionEvent.ACTION_DOWN, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        touch(view, MotionEvent.ACTION_MOVE, 600f, 560f, MotionEvent.TOOL_TYPE_FINGER)   // scrolling
+        idle(700)
+        assertEquals(View.GONE, view.pasteHere.visibility)
+        touch(view, MotionEvent.ACTION_UP, 600f, 560f, MotionEvent.TOOL_TYPE_FINGER)
+        copied = false
+        touch(view, MotionEvent.ACTION_DOWN, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        idle(700)
+        assertEquals(View.GONE, view.pasteHere.visibility)
+        touch(view, MotionEvent.ACTION_UP, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        // Offered, then the pen touches the page: put away.
+        copied = true
+        touch(view, MotionEvent.ACTION_DOWN, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        idle(700)
+        touch(view, MotionEvent.ACTION_UP, 600f, 600f, MotionEvent.TOOL_TYPE_FINGER)
+        assertEquals(View.VISIBLE, view.pasteHere.visibility)
+        touch(view, MotionEvent.ACTION_DOWN, 300f, 300f, MotionEvent.TOOL_TYPE_STYLUS)
+        touch(view, MotionEvent.ACTION_UP, 300f, 300f, MotionEvent.TOOL_TYPE_STYLUS)
+        assertEquals(View.GONE, view.pasteHere.visibility)
+    }
 }

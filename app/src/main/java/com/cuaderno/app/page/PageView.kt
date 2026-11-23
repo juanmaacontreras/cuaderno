@@ -374,6 +374,67 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         visibility = GONE
     }
 
+    /**
+     * Holding a finger still on the page for [PRESS_MS] offers "Pegar" right there, when
+     * [canPaste] says there is something to paste; tapping it hands [onPasteAt] that point, in
+     * pixels. Anything else that touches the page puts it away.
+     */
+    var canPaste: (() -> Boolean)? = null
+    var onPasteAt: ((x: Float, y: Float) -> Unit)? = null
+    private var pressX = 0f
+    private var pressY = 0f
+    private var pressing = false
+    private val press = Runnable { offerPaste() }
+
+    val pasteHere: View = Ui.row(context).apply {
+        val d = resources.displayMetrics.density
+        background = Ui.rounded(Ui.ACCENT, 22f, context)
+        setPadding((18 * d).toInt(), (10 * d).toInt(), (22 * d).toInt(), (10 * d).toInt())
+        elevation = 8 * d
+        gravity = Gravity.CENTER_VERTICAL
+        addView(View(context).apply { background = Icons.drawable("pages", Ui.BG) },
+            android.widget.LinearLayout.LayoutParams((20 * d).toInt(), (20 * d).toInt()))
+        addView(Ui.text(context, Strings.PASTE, 16f, Ui.BG, bold = true).apply { setPadding((10 * d).toInt(), 0, 0, 0) })
+        setOnClickListener {
+            visibility = GONE
+            onPasteAt?.invoke(pressX, pressY)
+        }
+        visibility = GONE
+    }
+
+    private fun startPress(x: Float, y: Float) {
+        pressX = x; pressY = y
+        pressing = true
+        timer.postDelayed(press, PRESS_MS)
+    }
+
+    private fun cancelPress() {
+        if (!pressing) return
+        pressing = false
+        timer.removeCallbacks(press)
+    }
+
+    /** The finger stayed: the page goes back to where it was under it and "Pegar" shows above it. */
+    private fun offerPaste() {
+        pressing = false
+        if (canPaste?.invoke() != true) return
+        if (gesture) {
+            scale = startScale; offsetX = startX; offsetY = startY
+            gesture = false
+            redraw()
+        }
+        val d = resources.displayMetrics.density
+        val chip = pasteHere
+        chip.measure(MeasureSpec.UNSPECIFIED, MeasureSpec.UNSPECIFIED)
+        val w = chip.measuredWidth.toFloat(); val h = chip.measuredHeight.toFloat()
+        // Above the finger so the hand does not cover it; below it when there is no room.
+        val above = pressY - h - 28f * d
+        chip.translationX = (pressX - w / 2).coerceIn(8f * d, maxOf(8f * d, width - w - 8f * d))
+        chip.translationY = if (above >= 8f * d) above else pressY + 28f * d
+        chip.visibility = VISIBLE
+        performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+    }
+
     init {
         setBackgroundColor(Render.DESK)
         addView(display.view, LayoutParams(-1, -1))
@@ -383,6 +444,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         addView(pasteChip, LayoutParams(-2, -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
             topMargin = (20 * resources.displayMetrics.density).toInt()
         })
+        addView(pasteHere, LayoutParams(-2, -2, Gravity.TOP or Gravity.START))
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -414,15 +476,19 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** Everything is the page's, except a touch that lands on the selection's actions or "Pegar". */
     override fun onInterceptTouchEvent(event: MotionEvent): Boolean {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            onActions = penId == -1 && (over(actions, event) || over(pasteChip, event))
+            onActions = penId == -1 && (over(actions, event) || over(pasteChip, event) || over(pasteHere, event))
         }
         return !onActions
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val index = event.actionIndex
-        // Touching the page stops it where it is.
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) stopMotion()
+        // Touching the page stops it where it is, and puts away a "Pegar" offered there.
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            stopMotion()
+            pasteHere.visibility = GONE
+        }
+        if (event.actionMasked != MotionEvent.ACTION_DOWN && event.actionMasked != MotionEvent.ACTION_MOVE) cancelPress()
         if (penId == -1 && !isPen(event, index)) {
             if (tracker == null) tracker = VelocityTracker.obtain()
             tracker?.addMovement(event)
@@ -469,6 +535,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                         drop()
                     }
                     rebase(event, -1)
+                    // One finger down and nothing else: held still, it offers "Pegar".
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN && penId == -1) startPress(event.x, event.y)
                 }
             }
             MotionEvent.ACTION_MOVE -> {
@@ -486,6 +554,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                     val i = event.findPointerIndex(dragFinger)
                     if (i >= 0) dragTo(event.getX(i), event.getY(i))
                 } else {
+                    if (pressing && hypot(event.x - pressX, event.y - pressY) > ViewConfiguration.get(context).scaledTouchSlop) cancelPress()
                     fingers(event)
                 }
             }
@@ -530,6 +599,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         timer.removeCallbacks(hold)
         holdPull(false)
         stopEdge()
+        cancelPress()
         stopMotion()
     }
 
@@ -886,11 +956,11 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
      * Puts a picture of [w] x [h] pixels in the middle of what is in view, no wider than most of
      * the sheet, taken (with the lasso in hand) so it can be moved and sized like ink. One undo.
      */
-    fun insertPicture(name: String, bytes: ByteArray, w: Int, h: Int) {
+    fun insertPicture(name: String, bytes: ByteArray, w: Int, h: Int, atX: Float = width / 2f, atY: Float = height / 2f) {
         val doc = document ?: return
         if (scale == 0f || w <= 0 || h <= 0) return
         val pages = doc.pages
-        val n = currentPage
+        val n = Render.pageAt(pages, (atY - offsetY) / scale)
         val page = pages[n]
         val top = Render.top(pages, n)
         val pad = BOX_PAD
@@ -898,8 +968,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val k = minOf((page.width - 2 * pad) * 0.7f / w, (height / scale) * 0.6f / h, (page.height - 2 * pad) / h)
         val pw = w * k
         val ph = h * k
-        val cx = (width / 2f - offsetX) / scale
-        val cy = (height / 2f - offsetY) / scale - top
+        val cx = (atX - offsetX) / scale
+        val cy = (atY - offsetY) / scale - top
         val x = (cx - pw / 2).coerceIn(pad, maxOf(pad, page.width - pad - pw))
         val y = (cy - ph / 2).coerceIn(pad, maxOf(pad, page.height - pad - ph))
         val index = doc.insert(n, Picture(name, bytes, x, y, pw, ph))
@@ -912,6 +982,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     private fun copySelection() {
         Clipboard.clip = Clip.of(taken(), takenPictures())
+        Clipboard.systemStamp = com.cuaderno.app.Pasted.stamp(context)
         marks.update()
     }
 
@@ -919,16 +990,16 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
      * What was copied, in the middle of what is in view on the page there, taken so it can be
      * dragged into place. Then "Pegar" goes away (until something else is copied).
      */
-    fun paste() {
+    fun paste(atX: Float = width / 2f, atY: Float = height / 2f) {
         val clip = Clipboard.clip ?: return
         val doc = document ?: return
         val pages = doc.pages
         if (scale == 0f) return
-        val n = currentPage
+        val n = Render.pageAt(pages, (atY - offsetY) / scale)
         val page = pages[n]
         val top = Render.top(pages, n)
-        val cx = (width / 2f - offsetX) / scale
-        val cy = (height / 2f - offsetY) / scale - top
+        val cx = (atX - offsetX) / scale
+        val cy = (atY - offsetY) / scale - top
         val pad = BOX_PAD
         val x = (cx - clip.width / 2).coerceIn(pad, maxOf(pad, page.width - pad - clip.width))
         val y = (cy - clip.height / 2).coerceIn(pad, maxOf(pad, page.height - pad - clip.height))
@@ -1505,6 +1576,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         /** How often the filling ring is drawn again while held. */
         const val FRAME_MS = 16L
         /** How near an edge of the screen a dragged selection moves the page, dp. */
+        /** How long a finger stays still for "Pegar". */
+        const val PRESS_MS = 500L
         const val EDGE = 56f
         /** How long it has to stay there first. */
         const val EDGE_WAIT_MS = 400L
