@@ -368,4 +368,48 @@ class LassoViewTest {
         assertEquals(1, view.document!!.pages[1].pictures.size)
         assertEquals(2, view.document!!.pages[1].strokes.size)
     }
+
+    private fun idle(ms: Long) =
+        org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(ms))
+
+    @Test fun heldNearTheBottomEdgeTheSelectionTakesThePageDown() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        val top = view.offsetY
+        view.penDown(200f, 108f)
+        view.penMove(200f, 450f)
+        view.penMove(200f, 785f)                       // 15 px from the bottom
+        idle(300)
+        assertEquals("not yet: passing by an edge does nothing", top, view.offsetY, 0.01f)
+        idle(300)
+        assertTrue("the page moved up under it: ${view.offsetY}", view.offsetY < top - 100f)
+        // Under the pen still: the stroke's start is where the pen holds it, as it went.
+        idle(2000)
+        val stopped = view.offsetY
+        idle(500)
+        assertEquals("at the sheet's end the page stops: it would leave the selection behind", stopped, view.offsetY, 0.01f)
+        view.penUp()
+        // Without the page moving it would have gone 677 px, 338.5 points, down: to 388.5.
+        val y = strokes(view)[0].y(0)
+        assertTrue("further down the sheet than the pen alone took it: $y", y > 388.5f + 300f)
+        assertTrue("and still on it", y < 842f)
+    }
+
+    @Test fun movingAwayFromTheEdgeStopsThePage() {
+        val view = written()
+        loop(view, 80f, 80f, 340f, 140f)
+        val top = view.offsetY
+        view.penDown(200f, 108f)
+        view.penMove(200f, 785f)
+        idle(200)
+        view.penMove(200f, 600f)                       // back out before it starts
+        idle(1000)
+        assertEquals(top, view.offsetY, 0.01f)
+        view.penMove(200f, 785f)                       // and in again: the wait starts over
+        idle(300)
+        assertEquals(top, view.offsetY, 0.01f)
+        idle(300)
+        assertTrue(view.offsetY < top)
+        view.penUp()
+    }
 }

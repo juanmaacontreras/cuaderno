@@ -192,8 +192,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val (px, py) = push(dragAtX, dragAtY)
         val step = EDGE_SPEED * resources.displayMetrics.density * FRAME_MS / 1000f
         // Not past where the selection can go: the page would slide away from under it.
-        val canX = if (l.corner < 0) (px < 0 && liftX > l.minX) || (px > 0 && liftX < l.maxX) else liftK < l.maxK || px < 0
-        val canY = if (l.corner < 0) (py < 0 && liftY > l.minY) || (py > 0 && liftY < l.maxY) else liftK < l.maxK || py < 0
+        val canX = l.corner >= 0 || (px < 0 && liftX > l.minX) || (px > 0 && liftX < l.maxX)
+        val canY = l.corner >= 0 || (py < 0 && liftY > l.minY) || (py > 0 && liftY < l.maxY)
         val beforeX = offsetX; val beforeY = offsetY
         if (canX) offsetX -= px * step
         if (canY) offsetY -= py * step
