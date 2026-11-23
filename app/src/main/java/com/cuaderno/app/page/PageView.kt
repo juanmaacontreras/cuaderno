@@ -361,8 +361,6 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) stopMotion()
         if (penId == -1 && !isPen(event, index)) {
             if (tracker == null) tracker = VelocityTracker.obtain()
-            // A new touch measures from nothing: a pooled tracker can come back with old samples.
-            if (event.actionMasked == MotionEvent.ACTION_DOWN) tracker?.clear()
             tracker?.addMovement(event)
         }
         when (event.actionMasked) {
