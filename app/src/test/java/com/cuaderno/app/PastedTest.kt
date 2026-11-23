@@ -70,4 +70,21 @@ class PastedTest {
         assertFalse(Pasted.hasSomething(context))
         assertNull(Pasted.picture(context, null))
     }
+
+    @Test fun theNewerCopyIsPasted() {
+        // Only the lasso copied: the lasso's.
+        assertFalse(Pasted.systemIsNewer(lassoCopied = true, systemHas = false, stampNow = 0, stampAtCopy = 0))
+        // Copied in another app, nothing with the lasso: the other app's.
+        assertTrue(Pasted.systemIsNewer(lassoCopied = false, systemHas = true, stampNow = 5, stampAtCopy = 0))
+        // The lasso copied after the other app (the clipboard is as it was then): the lasso's.
+        assertFalse(Pasted.systemIsNewer(lassoCopied = true, systemHas = true, stampNow = 5, stampAtCopy = 5))
+        // Then another app copied again: that.
+        assertTrue(Pasted.systemIsNewer(lassoCopied = true, systemHas = true, stampNow = 9, stampAtCopy = 5))
+    }
+
+    @Test fun theClipboardsTimeIsReadWithoutReadingIt() {
+        assertEquals(0L, Pasted.stamp(context))
+        clipboard.setPrimaryClip(ClipData.newPlainText("texto", "hola"))
+        assertTrue(Pasted.stamp(context) > 0L)
+    }
 }
