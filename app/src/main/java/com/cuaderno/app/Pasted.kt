@@ -19,6 +19,20 @@ object Pasted {
             .filter { it.scheme == "content" || it.scheme == "file" }
     }
 
+    /** When Android's clipboard was last set, 0 when empty. Only the description: nothing read. */
+    fun stamp(context: Context): Long = try {
+        clipboard(context)?.primaryClipDescription?.timestamp ?: 0L
+    } catch (e: Exception) {
+        0L
+    }
+
+    /**
+     * Whether to paste what Android's clipboard holds rather than what the lasso copied: the
+     * newer of the two. The lasso's copy is newer while the clipboard has not changed since.
+     */
+    fun systemIsNewer(lassoCopied: Boolean, systemHas: Boolean, stampNow: Long, stampAtCopy: Long): Boolean =
+        systemHas && (!lassoCopied || stampNow != stampAtCopy)
+
     /** Anything copied at all: only the description, so Android does not say the app read it. */
     fun hasSomething(context: Context): Boolean = clipboard(context)?.hasPrimaryClip() == true
 
