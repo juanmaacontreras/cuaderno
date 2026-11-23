@@ -141,6 +141,70 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     /** The finger moving the selection, or -1 (the pen moves it through [penId]). */
     private var dragFinger = -1
 
+    /**
+     * Dragging what the lasso took near an edge of the screen moves the page that way, so it can
+     * go where is not in view. Only after it has stayed there [EDGE_WAIT_MS]: passing by an edge
+     * does nothing. The deeper into the edge, the faster, up to [EDGE_SPEED].
+     */
+    private var dragAtX = 0f
+    private var dragAtY = 0f
+    /** When the drag got near an edge (uptime ms), 0 while it is not. */
+    private var edgeSince = 0L
+    private val edging = object : Runnable {
+        override fun run() {
+            if (lift == null || edgeSince == 0L) return
+            if (SystemClock.uptimeMillis() - edgeSince >= EDGE_WAIT_MS) edgeStep()
+            timer.postDelayed(this, FRAME_MS)
+        }
+    }
+
+    /** How hard the point at [x], [y] pushes against the edges: -1 to 1 each way, 0 away from them. */
+    private fun push(x: Float, y: Float): Pair<Float, Float> {
+        val zone = EDGE * resources.displayMetrics.density
+        fun along(v: Float, size: Float) = when {
+            v < zone -> -((zone - v) / zone).coerceIn(0f, 1f)
+            v > size - zone -> ((v - (size - zone)) / zone).coerceIn(0f, 1f)
+            else -> 0f
+        }
+        return Pair(along(x, width.toFloat()), along(y, height.toFloat()))
+    }
+
+    private fun watchEdge(x: Float, y: Float) {
+        dragAtX = x; dragAtY = y
+        val (px, py) = push(x, y)
+        val near = px != 0f || py != 0f
+        if (near && edgeSince == 0L) {
+            edgeSince = SystemClock.uptimeMillis()
+            timer.postDelayed(edging, FRAME_MS)
+        } else if (!near) {
+            stopEdge()
+        }
+    }
+
+    private fun stopEdge() {
+        edgeSince = 0L
+        timer.removeCallbacks(edging)
+    }
+
+    /** One frame of moving the page under the held selection, which keeps following the pen or finger. */
+    private fun edgeStep() {
+        val l = lift ?: return
+        val (px, py) = push(dragAtX, dragAtY)
+        val step = EDGE_SPEED * resources.displayMetrics.density * FRAME_MS / 1000f
+        // Not past where the selection can go: the page would slide away from under it.
+        val canX = l.corner >= 0 || (px < 0 && liftX > l.minX) || (px > 0 && liftX < l.maxX)
+        val canY = l.corner >= 0 || (py < 0 && liftY > l.minY) || (py > 0 && liftY < l.maxY)
+        val beforeX = offsetX; val beforeY = offsetY
+        if (canX) offsetX -= px * step
+        if (canY) offsetY -= py * step
+        clamp()
+        val movedX = offsetX - beforeX; val movedY = offsetY - beforeY
+        if (movedX == 0f && movedY == 0f) return
+        // The page moved under the pen: measure the drag from where its start is now.
+        dragFromX += movedX; dragFromY += movedY
+        dragTo(dragAtX, dragAtY)
+    }
+
     /** Called on the main thread after the notebook changes. */
     var onChange: (() -> Unit)? = null
 
@@ -465,6 +529,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         super.onDetachedFromWindow()
         timer.removeCallbacks(hold)
         holdPull(false)
+        stopEdge()
         stopMotion()
     }
 
@@ -784,6 +849,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     private fun dragTo(x: Float, y: Float) {
         val l = lift ?: return
+        watchEdge(x, y)
         val dx = (x - dragFromX) / scale
         val dy = (y - dragFromY) / scale
         if (l.corner < 0) {
@@ -800,6 +866,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     /** Leaves the dragged strokes where they are now: one undo step. */
     private fun drop() {
+        stopEdge()
         val l = lift ?: return
         val p = picked
         val dx = liftX; val dy = liftY; val k = liftK
@@ -875,6 +942,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
 
     /** The drag was the palm: everything back where it was. */
     private fun cancelDrag() {
+        stopEdge()
         if (lift == null) return
         lift = null
         redraw()
@@ -1436,6 +1504,12 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         const val PULL_HOLD_MS = 1500L
         /** How often the filling ring is drawn again while held. */
         const val FRAME_MS = 16L
+        /** How near an edge of the screen a dragged selection moves the page, dp. */
+        const val EDGE = 56f
+        /** How long it has to stay there first. */
+        const val EDGE_WAIT_MS = 400L
+        /** How fast the page moves at the very edge, dp a second. */
+        const val EDGE_SPEED = 900f
         /** Points of room between what the lasso took and its box. */
         const val BOX_PAD = 8f
         /** dp around the box that still count as on it, for a finger. */
