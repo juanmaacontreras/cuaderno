@@ -24,6 +24,12 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- A selection dragged to an edge moves the page (v35): tested (`LassoViewTest`: nothing in the
+  first 0.4 s, then the page moves and the stroke ends further down than the pen alone took
+  it, stopping at the sheet's end; leaving the edge stops it and coming back waits again), seen
+  failing with the page never moving and with the wait never restarting. Emulator: a stroke
+  dragged with adb's stylus to the bottom and held, the page went down with it. Not on the tablet.
+
 - A new page needs the pull held (v34): tested (`PageViewTest`: a little, far and let go at
   once, held too short add nothing; held adds one and shows its top), seen failing with the old
   rule. The coast test needed the clock moved past earlier tests (Robolectric turns it back,

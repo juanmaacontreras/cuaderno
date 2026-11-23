@@ -5,6 +5,14 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-23
 
+- **A selection dragged to an edge moves the page** (origen: Juanma, "cuando me acerco a los
+  bordes, yo pueda empezar a moverme... pero que no me deslice por error"; the numbers are
+  Claude's). Held within 56 dp of an edge of the screen for 0.4 s, the page moves that way,
+  faster the closer to the edge (up to 900 dp a second), and what is dragged keeps following
+  the pen or finger. Passing by an edge does nothing, and leaving it starts the wait over. The
+  page stops where the selection cannot follow (the sheet's end): moving to another page is
+  still cut and paste. Works for moving and for resizing by a corner.
+
 - **A new page needs the pull held** (origen: Juanma, "si scrolleo de más, sin querer, creo una
   página nueva... que tenga que mantener unos 2 segundos"; 1.5 s and the look are Claude's).
   Pulled far enough, the ring round the "+" fills while the finger stays (it says "Mantené
