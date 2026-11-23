@@ -62,6 +62,8 @@ class WriteActivity : Activity() {
     private lateinit var notice: TextView
     private lateinit var updateButton: TextView
     private var update: Updater.Release? = null
+    /** Between onResume and onPause: only then can the installer open. */
+    private var resumed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -172,9 +174,10 @@ class WriteActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        resumed = true
         updater.check(this) { release ->
             update = release
-            updateButton.text = Strings.UPDATE + " · v" + release.version
+            if (!updater.isDownloading()) updateButton.text = updateLabel(release)
             updateButton.visibility = View.VISIBLE
         }
     }
@@ -182,6 +185,7 @@ class WriteActivity : Activity() {
     /** Leaving the screen is the last sure moment before the system may kill the app. */
     override fun onPause() {
         super.onPause()
+        resumed = false
         store.saveNow(document)
         showProblem(store.problem?.let { Strings.SAVE_FAILED + it })
     }
@@ -448,15 +452,24 @@ class WriteActivity : Activity() {
         val release = update ?: return
         updater.install(this, release) { state ->
             when (state) {
-                Updater.State.NEEDS_PERMISSION -> toast(Strings.UPDATE_PERMISSION)
-                Updater.State.DOWNLOADING -> updateButton.text = Strings.UPDATE_DOWNLOADING
-                Updater.State.FAILED -> {
-                    updateButton.text = Strings.UPDATE + " · v" + release.version
+                Updater.State.NeedsPermission -> toast(Strings.UPDATE_PERMISSION)
+                is Updater.State.Downloading -> updateButton.text = Strings.updateDownloading(state.percent)
+                Updater.State.Ready -> {
+                    updateButton.text = updateLabel(release)
+                    // Android refuses to open the installer for an app off the screen:
+                    // then the button says "Instalar" and the next tap opens it.
+                    if (resumed && !updater.openInstaller(this, release)) toast(Strings.UPDATE_OPEN_FAILED)
+                }
+                Updater.State.Failed -> {
+                    updateButton.text = updateLabel(release)
                     toast(Strings.UPDATE_FAILED)
                 }
             }
         }
     }
+
+    private fun updateLabel(release: Updater.Release) =
+        (if (updater.isDownloaded(this, release)) Strings.UPDATE_INSTALL else Strings.UPDATE) + " · v" + release.version
 
     private fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
 
