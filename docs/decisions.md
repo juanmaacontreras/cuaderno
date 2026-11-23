@@ -5,6 +5,16 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-23
 
+- **Hold a finger to paste, there** (origen: Juanma, "no me gusta ir a los 3 puntitos y tocar
+  pegar imagen; me gustaría mantener y que ahí me aparezca pegar"; the details are Claude's).
+  A finger held still on the page for half a second shows "Pegar" just above it (below when
+  there is no room), with a buzz, when something is copied; it pastes centred on that point,
+  on the page under it. What is pasted is the newer copy: the lasso's "Copiar", or what
+  another app put on Android's clipboard after it (compared by the clipboard's own time,
+  which Android gives without the app reading the clipboard). "Pegar imagen" leaves the ⋮
+  menu. A finger that moves, a second finger or the pen cancels it, and any touch puts the
+  "Pegar" away. The pen is left out: holding it still already tidies a stroke.
+
 - **A selection dragged to an edge moves the page** (origen: Juanma, "cuando me acerco a los
   bordes, yo pueda empezar a moverme... pero que no me deslice por error"; the numbers are
   Claude's). Held within 56 dp of an edge of the screen for 0.4 s, the page moves that way,
