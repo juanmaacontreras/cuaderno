@@ -155,13 +155,40 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     var onPenDown: (() -> Unit)? = null
 
     /**
-     * Pulling past the last page with a finger and letting go far enough asks for a new page
-     * (as in Samsung Notes). Whoever listens adds it to the notebook and sets [document] again.
+     * Pulling past the last page with a finger far enough, holding it there for [PULL_HOLD_MS]
+     * and letting go asks for a new page, so a scroll that overshoots never adds one. Whoever
+     * listens adds it to the notebook and sets [document] again.
      */
     var onAddPage: (() -> Unit)? = null
     /** How far past the last page the finger has pulled the notebook, pixels; 0 when it has not. */
     @Volatile private var pull = 0f
     private val enough get() = PULL * resources.displayMetrics.density
+    /** When the pull first got far enough (uptime ms), 0 while it is not. */
+    private var pullSince = 0L
+    /** How much of the hold is done, 0 to 1. */
+    private fun held(now: Long = SystemClock.uptimeMillis()): Float =
+        if (pullSince == 0L) 0f else ((now - pullSince).toFloat() / PULL_HOLD_MS).coerceIn(0f, 1f)
+
+    /** While the finger holds a pull: the ring drawn again as it fills; nothing once it is full. */
+    private val filling = object : Runnable {
+        override fun run() {
+            if (pullSince == 0L) return
+            val done = held() >= 1f
+            redraw()
+            if (done) performHapticFeedback(android.view.HapticFeedbackConstants.CONFIRM)
+            else timer.postDelayed(this, FRAME_MS)
+        }
+    }
+
+    private fun holdPull(far: Boolean) {
+        if (far && pullSince == 0L) {
+            pullSince = SystemClock.uptimeMillis()
+            timer.postDelayed(filling, FRAME_MS)
+        } else if (!far && pullSince != 0L) {
+            pullSince = 0L
+            timer.removeCallbacks(filling)
+        }
+    }
 
     /** Told the page in the middle of the screen whenever that changes. On the main thread. */
     var onPageShown: ((Int) -> Unit)? = null
@@ -334,6 +361,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         if (event.actionMasked == MotionEvent.ACTION_DOWN) stopMotion()
         if (penId == -1 && !isPen(event, index)) {
             if (tracker == null) tracker = VelocityTracker.obtain()
+            // A new touch measures from nothing: a pooled tracker can come back with old samples.
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) tracker?.clear()
             tracker?.addMovement(event)
         }
         when (event.actionMasked) {
@@ -349,6 +378,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
                     if (gesture) {
                         scale = startScale; offsetX = startX; offsetY = startY
                         pull = 0f
+                        holdPull(false)
                         gesture = false
                         redraw()
                     }
@@ -421,7 +451,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             MotionEvent.ACTION_CANCEL -> {
                 if (penId != -1) penCancel()
                 if (dragFinger != -1) { dragFinger = -1; cancelDrag() }
-                if (pull > 0f) { pull = 0f; clamp(); redraw() }
+                if (pull > 0f) { pull = 0f; holdPull(false); clamp(); redraw() }
                 penId = -1
                 ignored.clear()
                 if (gesture) release()
@@ -436,6 +466,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
         timer.removeCallbacks(hold)
+        holdPull(false)
         stopMotion()
     }
 
@@ -914,8 +945,11 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             pull = ((bottom - offsetY) * 0.5f).coerceAtMost(enough * 1.3f)
             clamp()
             offsetY = bottom - pull
+            // Held a little short of enough still counts: a hand is never perfectly still.
+            holdPull(pull >= enough * (if (pullSince == 0L) 1f else 0.85f))
         } else {
             pull = 0f
+            holdPull(false)
             clamp()
         }
         redraw()
@@ -925,7 +959,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     private fun letGo() {
         val from = pull
         val fromY = offsetY
-        val add = from >= enough && onAddPage != null
+        val add = held() >= 1f && onAddPage != null
+        holdPull(false)
         if (add) onAddPage?.invoke()
         pull = 0f
         val pages = document?.pages ?: return
@@ -1120,41 +1155,58 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     }
 
     /**
-     * Below the last page while it is pulled: a "+" and what letting go will do. It fills in
-     * once the pull is enough. Drawn in the space between the sheet's end and the screen's.
+     * Below the last page while it is pulled: a "+" in a ring and what to do. Far enough, the
+     * ring fills round while the finger holds; full, it turns solid and letting go adds the page.
+     * Drawn in the space between the sheet's end and the screen's.
      */
     private fun pulled(canvas: Canvas, brush: Brush, top: Float, bottom: Float, p: Float) {
         if (bottom - top < 1f) return
         val d = resources.displayMetrics.density
-        val ready = p >= enough
+        val far = pullSince != 0L
+        val done = held()
+        val ready = far && done >= 1f
         val fade = (p / enough).coerceIn(0f, 1f)
+        val alpha = (255 * fade).toInt()
         val cx = width / 2f
         val r = 22f * d
         val cy = (top + bottom) / 2f - 14f * d
         val ring = brush.pullRing
-        ring.alpha = 255
+        ring.strokeCap = Paint.Cap.ROUND
         if (ready) {
             ring.style = Paint.Style.FILL
             ring.color = Ui.ACCENT
+            ring.alpha = alpha
+            canvas.drawCircle(cx, cy, r, ring)
         } else {
             ring.style = Paint.Style.STROKE
             ring.strokeWidth = 2f * d
             ring.color = Ui.DIM
+            ring.alpha = alpha
+            canvas.drawCircle(cx, cy, r, ring)
+            if (far && done > 0f) {
+                // The hold so far, clockwise from the top.
+                ring.strokeWidth = 4f * d
+                ring.color = Ui.ACCENT
+                ring.alpha = alpha
+                canvas.drawArc(cx - r, cy - r, cx + r, cy + r, -90f, 360f * done, false, ring)
+            }
         }
-        ring.alpha = (255 * fade).toInt()
-        canvas.drawCircle(cx, cy, r, ring)
         ring.style = Paint.Style.STROKE
         ring.strokeWidth = 2.5f * d
-        ring.strokeCap = Paint.Cap.ROUND
         ring.color = if (ready) Ui.BG else Ui.TEXT
-        ring.alpha = (255 * fade).toInt()
+        ring.alpha = alpha
         canvas.drawLine(cx - 9f * d, cy, cx + 9f * d, cy, ring)
         canvas.drawLine(cx, cy - 9f * d, cx, cy + 9f * d, ring)
         val text = brush.pullText
         text.textSize = 15f * d
         text.color = if (ready) Ui.TEXT else Ui.DIM
-        text.alpha = (255 * fade).toInt()
-        canvas.drawText(if (ready) Strings.PULL_LET_GO else Strings.PULL_MORE, cx, cy + r + 26f * d, text)
+        text.alpha = alpha
+        val say = when {
+            ready -> Strings.PULL_LET_GO
+            far -> Strings.PULL_HOLD
+            else -> Strings.PULL_MORE
+        }
+        canvas.drawText(say, cx, cy + r + 26f * d, text)
     }
 
     /** The view as an image, for tests and renders. */
@@ -1382,6 +1434,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         const val MARGIN = 8f
         /** How far past the last page to pull for a new one, dp. */
         const val PULL = 96f
+        /** How long to hold the pull before letting go adds the page. */
+        const val PULL_HOLD_MS = 1500L
+        /** How often the filling ring is drawn again while held. */
+        const val FRAME_MS = 16L
         /** Points of room between what the lasso took and its box. */
         const val BOX_PAD = 8f
         /** dp around the box that still count as on it, for a finger. */

@@ -365,16 +365,23 @@ class PageViewTest {
     }
 
     /** One finger up past the last page: far enough and let go adds a page and goes to it; not enough springs back. */
-    @Test fun pullingPastTheLastPageAddsOne() {
+    @Test fun pullingPastTheLastPageAndHoldingAddsOne() {
         val view = page()
         var asked = 0
         view.onAddPage = { asked++; view.document!!.addPage(); view.document = view.document }
         val bottom = view.offsetY.let { view.scrollBy(0f, -100000f); view.offsetY }
-        fun pull(by: Float) {
+        fun pull(by: Float, holdMs: Long = 0) {
             touch(view, MotionEvent.ACTION_DOWN, 600f, 700f, MotionEvent.TOOL_TYPE_FINGER)
             for (i in 1..8) {
                 org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(40))
                 touch(view, MotionEvent.ACTION_MOVE, 600f, 700f - by * i / 8, MotionEvent.TOOL_TYPE_FINGER)
+            }
+            // Held, with the hand's small tremble, the ring drawn meanwhile.
+            var held = 0L
+            while (held < holdMs) {
+                idle(100)
+                held += 100
+                touch(view, MotionEvent.ACTION_MOVE, 600f, 700f - by + (held / 100 % 2) * 3f, MotionEvent.TOOL_TYPE_FINGER)
             }
             touch(view, MotionEvent.ACTION_UP, 600f, 700f - by, MotionEvent.TOOL_TYPE_FINGER)
         }
@@ -384,8 +391,17 @@ class PageViewTest {
         assertEquals(0, asked)
         assertEquals(1, view.document!!.pages.size)
         assertEquals(bottom, view.offsetY, 0.5f)
-        // Enough (96 dp at half the finger): a page, and the new page's top on screen.
+        // Far enough but let go at once, as a scroll that overshoots: nothing either.
         pull(400f)
+        idle(400)
+        assertEquals(0, asked)
+        assertEquals(bottom, view.offsetY, 0.5f)
+        // Far enough, not held long enough: nothing.
+        pull(400f, holdMs = 300)
+        idle(400)
+        assertEquals(0, asked)
+        // Far enough and held: a page, and the new page's top on screen.
+        pull(400f, holdMs = 2000)
         idle(500)
         assertEquals(1, asked)
         assertEquals(2, view.document!!.pages.size)
