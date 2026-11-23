@@ -203,6 +203,12 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
     @Volatile var offsetY = 0f
         private set
     private var fit = 1f
+    /**
+     * The smallest the sheet stays: a whole page on the screen, and never less than [SMALLEST]
+     * of the screen's width (upright, a page already fits at the full width). Pinched smaller,
+     * it springs back to this.
+     */
+    private var smallest = 1f
 
     // The pen
     private var penId = -1
@@ -295,6 +301,8 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         val pageWidth = document?.pages?.firstOrNull()?.width ?: cuaderno.core.Page.A4_WIDTH
         val wasFit = scale == 0f || scale == fit
         fit = (w - 2 * margin) / pageWidth
+        val pageHeight = document?.pages?.firstOrNull()?.height ?: cuaderno.core.Page.A4_HEIGHT
+        smallest = minOf(fit * SMALLEST, (h - 2 * margin) / pageHeight).coerceIn(fit * 0.3f, fit)
         if (wasFit) {
             // The sheet as wide as the screen, like paper on a desk.
             scale = fit
@@ -894,14 +902,14 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         if (!gesture) return
         val used = measure(event, -1)
         if (used == 0) return
-        val next = if (span > 0f && startSpan > 0f) (startScale * span / startSpan).coerceIn(fit * ELASTIC_ZOOM, fit * MAX_ZOOM)
+        val next = if (span > 0f && startSpan > 0f) (startScale * span / startSpan).coerceIn(smallest * ELASTIC_ZOOM, fit * MAX_ZOOM)
             else startScale
         // The point of the notebook under the fingers stays under them.
         offsetX = cx - (startCx - startX) * next / startScale
         offsetY = cy - (startCy - startY) * next / startScale
         scale = next
         val bottom = rangeY(next).first
-        if (used == 1 && next >= fit && offsetY < bottom) {
+        if (used == 1 && next >= smallest && offsetY < bottom) {
             // Past the last page: the notebook follows at half the finger, and not much further than enough.
             pull = ((bottom - offsetY) * 0.5f).coerceAtMost(enough * 1.3f)
             clamp()
@@ -950,7 +958,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             letGo()
             return
         }
-        if (scale < fit) {
+        if (scale < smallest) {
             settle()
             return
         }
@@ -977,20 +985,21 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         }
     }
 
-    /** Back to the sheet as wide as the screen, keeping what is in the middle of the screen there. */
+    /** Back to the smallest the sheet stays, keeping what is in the middle of the screen there. */
     private fun settle() {
         val fromScale = scale
         val fromX = offsetX
         val fromY = offsetY
-        val toY = (height / 2f - (height / 2f - fromY) * fit / fromScale)
-            .coerceIn(rangeY(fit).first, rangeY(fit).second)
-        val toX = rangeX(fit).second
+        val to = smallest
+        val toY = (height / 2f - (height / 2f - fromY) * to / fromScale)
+            .coerceIn(rangeY(to).first, rangeY(to).second)
+        val toX = rangeX(to).second
         settling = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 180
             interpolator = DecelerateInterpolator()
             addUpdateListener {
                 val t = it.animatedValue as Float
-                scale = fromScale + (fit - fromScale) * t
+                scale = fromScale + (to - fromScale) * t
                 offsetX = fromX + (toX - fromX) * t
                 offsetY = fromY + (toY - fromY) * t
                 redraw()
@@ -1006,7 +1015,7 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
             it.cancel()
             settling = null
             // Caught half way back: finish it at once rather than leave the sheet small or pulled.
-            if (scale < fit || pull > 0f) { scale = maxOf(scale, fit); pull = 0f; clamp(); redraw() }
+            if (scale < smallest || pull > 0f) { scale = maxOf(scale, smallest); pull = 0f; clamp(); redraw() }
         }
     }
 
@@ -1386,8 +1395,10 @@ class PageView(context: Context, lowLatency: Boolean) : FrameLayout(context) {
         /** Holding the pen this long, this still (dp), at the end of a stroke tidies it. */
         const val HOLD_MS = 600L
         const val HOLD_SLOP = 4f
-        /** While pinching, the sheet can get this much smaller than the screen; letting go brings it back. */
-        const val ELASTIC_ZOOM = 0.5f
+        /** While pinching, the sheet can get this much smaller than the smallest it stays; letting go brings it back. */
+        const val ELASTIC_ZOOM = 0.8f
+        /** Zoomed out, the sheet never narrower than this part of the screen's width. */
+        const val SMALLEST = 0.75f
         const val MAX_ZOOM = 5f
     }
 }

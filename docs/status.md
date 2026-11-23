@@ -24,6 +24,11 @@ points, shared by screen and PDF), `Store`,
 
 ## Verified, and not
 
+- Zooming out to a whole page (v33): tested (`PageViewTest`: left smaller it stays, centred;
+  pinched past a whole page it springs back to it; zooming in again), seen failing with the old
+  limit. Emulator: a raw two-finger pinch (sendevent, root) left the sheet small and centred.
+  Not on the tablet.
+
 - Pictures from the clipboard and the gallery (v32): tested (`PastedTest`: an image another app
   copied as a link comes in at its size as JPEG, a big one no longer than 1600 px, text and a
   link to a PDF give nothing, nothing copied offers nothing), two checks seen failing with the

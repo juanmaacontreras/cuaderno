@@ -5,6 +5,12 @@ The plan (`plan.md`) is corrected here when reality contradicts it.
 
 ## 2026-11-23
 
+- **Zooming out goes past the full width** (origen: Juanma, "que pueda hacer un poquito más de
+  zoom out"; the limit is Claude's). The sheet now stays as small as a whole page on the
+  screen (lying down, about half the width), and never under three quarters of the width
+  (standing up, where a page already fits at the full width). Pinched smaller, it springs back
+  to that, no longer to the full width. Zooming out further is one number (`SMALLEST`).
+
 - **Pictures from the clipboard and the gallery** (origen: Juanma, "copiar y pegar imágenes
   del portapapeles, o de la galería", to start using the app; the details are Claude's). The
   ⋮ menu has "Pegar imagen" whenever Android's clipboard holds something: an image copied in

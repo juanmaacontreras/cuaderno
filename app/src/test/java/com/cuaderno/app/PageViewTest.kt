@@ -179,18 +179,22 @@ class PageViewTest {
         }
     }
 
-    @Test fun pinchedSmallerThanTheScreenTheSheetFollowsTheFingersAndSpringsBack() {
+    @Test fun zoomedOutTheSheetStaysSmallerThanTheScreenDownToAWholePage() {
         val view = page()
         val fit = view.scale
-        pinch(view, 600f, 360f, release = false)
-        assertEquals(fit * 0.6f, view.scale, fit * 0.02f)       // it follows the fingers below the screen's width
         pinch(view, 600f, 360f)
         idle(400)
-        assertEquals(fit, view.scale, 0.0001f)                  // and comes back when they let go
-        assertEquals((1206 - 595f * fit) / 2, view.offsetX, 0.5f)
+        assertEquals("it stays where the fingers left it", fit * 0.6f, view.scale, fit * 0.02f)
+        assertEquals("in the middle", (1206 - 595f * view.scale) / 2, view.offsetX, 0.5f)
+        // Smaller than a whole page on the screen: back to just that.
+        pinch(view, 600f, 150f, release = false)
+        assertTrue("it follows the fingers a little past it", view.scale < (view.height - 16f) / 842f)
+        pinch(view, 600f, 150f)
+        idle(400)
+        assertEquals("the whole sheet in view", view.height - 16f, 842f * view.scale, 1f)
         pinch(view, 300f, 600f)
         idle(400)
-        assertEquals(fit * 2, view.scale, fit * 0.05f)          // zooming in stays where it was left
+        assertTrue("zooming in stays where it was left", view.scale > fit * 0.9f)
     }
 
     @Test fun thePageCoastsAfterAFlickAndATouchStopsIt() {
